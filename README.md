@@ -30,7 +30,7 @@ This emulator is not accurate in many ways and does not compete with
 
 I wrote it in the goal to better understand the Apple ][ internals, and I'm publishing the sources in the hope they will be of any help.
 
-It's compact, less 800 SLOC, with two source files only, one for the CPU emulation, the other for the computer itself.
+It's compact, less 1000 SLOC, with two source files only, one for the CPU emulation, the other for the computer itself.
 
 I did my best to comment everything, and if you have an idea of how an Apple ][ works, it should be easy for you to understand the code, modify and enhance it for your needs (see TODO section).
 
