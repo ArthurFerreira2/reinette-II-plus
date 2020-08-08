@@ -1,7 +1,7 @@
 /*
   Puce6502 - MOS 6502 cpu emulator
   Last modified 1st of August 2020
-  Copyright (c) 2017 Arthur Ferreira
+  Copyright (c) 2018 Arthur Ferreira (arthur.ferreira2@gmail.com)
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
