@@ -21,7 +21,7 @@ After [reinette](https://github.com/ArthurFerreira2/reinette) (Apple 1 emulator)
 * zoom the window by integer increments
 
 
-It uses the same MOS 6502 CPU emulator as her sisters (now christened puce6502).\
+It uses the same MOS 6502 CPU emulator as her sisters (now christened [puce6502](https://github.com/ArthurFerreira2/puce6502)).\
 You only need SDL2 to compile it. (I'm not using SDL_Mixer, but only the native SDL2 audio functions)
 
 
@@ -30,7 +30,7 @@ This emulator is not accurate in many ways and does not compete with
 
 I wrote it in the goal to better understand the Apple ][ internals, and I'm publishing the sources in the hope they will be of any help.
 
-It's compact, less 1000 SLOC, with two source files only, one for the CPU emulation, the other for the computer itself.
+It's compact, less 800 SLOC, with two source files only, one for the CPU emulation, the other for the computer itself.
 
 I did my best to comment everything, and if you have an idea of how an Apple ][ works, it should be easy for you to understand the code, modify and enhance it for your needs (see TODO section).
 
@@ -46,7 +46,7 @@ Drag and drop a disk image file (.nib format only) to inset it into drive 1\
 Drop the file while pressing the ALT key to insert it into drive 2
 
 Use the functions keys to control the emulator itself
-
+```
 * F1    : writes the changes of the floppy in current drive back to host
 * F5    : zoom out down to 1:1
 * F6    : zoom in, no magnification limit
@@ -61,20 +61,20 @@ Paddles / Joystic :
 * numpad 1 : left
 * numpad 3 : right
 * numpad 2 : down
-* numpad 3 : up 
+* numpad 3 : up
 * CTRL     : button 0
 * ALT      : button 1
-
+```
 
 ### limitations
 
-* High pitch noise at high volume (might be related with my environment)
-* Sound cracks when playing for long period (intro music for example)
+* high pitch noise at high volume (might be related with my environment)
+* sound cracks when playing for long period (intro music for example)
 * CPU is not 100% cycle accurate - see source file for more details
-* Colors are approximate (taken from a scan of an old Beagle bros. poster)
+* colors are approximate (taken from a scan of an old Beagle bros. poster)
 * HGR is inhacurate, and does not implement color clashing
 * disk ][ access is artificially accelerated
-* Only support .nib floppy images. (you can use [CiderPress](https://github.com/fadden/ciderpress) to convert your images to this format)
+* only support .nib floppy images. (you can use [CiderPress](https://github.com/fadden/ciderpress) to convert your images to this format)
 * only has 48KB of RAM (can't run some software requiring the language card)
 * and many others ...
 
