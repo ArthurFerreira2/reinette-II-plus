@@ -1,7 +1,7 @@
 /*
 
  reinette II plus, a french Apple II emulator, using SDL2
- and powered by puce6502 - a MOS 6502 cpu emulator by the same autor
+ and powered by puce6502 - a MOS 6502 cpu emulator by the same author
  Last modified 1st of August 2020
  Copyright (c) 2020 Arthur Ferreira (arthur.ferreira2@gmail.com)
 
