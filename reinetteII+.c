@@ -353,8 +353,16 @@ int main(int argc, char *argv[]){
         switch (event.key.keysym.sym){
 
           // EMULATOR CONTROL :
-          case SDLK_INSERT:                         // Shift+Insert => paste txt
-            if (shift && SDL_HasClipboardText()){
+          case SDLK_F1:                             // save curDrv back to host
+            if (disk[curDrv].filename[0] && !disk[curDrv].readOnly)
+              if((f = fopen(disk[curDrv].filename, "wb"))){
+                fwrite(disk[curDrv].data, 1, 232960, f);
+                fclose(f);
+              }
+            break;
+
+          case SDLK_F4:                             // paste txt from clipboard
+            if (SDL_HasClipboardText()){
               char *clipboardText = SDL_GetClipboardText();
               int c = 0;
               while (clipboardText[c]){             // all chars until ascii NUL
@@ -364,14 +372,6 @@ int main(int argc, char *argv[]){
               }
               SDL_free(clipboardText);
             }
-            break;
-
-          case SDLK_F1:                             // save curDrv back to host
-            if (disk[curDrv].filename[0] && !disk[curDrv].readOnly)
-              if((f = fopen(disk[curDrv].filename, "wb"))){
-                fwrite(disk[curDrv].data, 1, 232960, f);
-                fclose(f);
-              }
             break;
 
           case SDLK_F5: if ((zoom-=2) < 0) zoom = 0;                 // zoom out
@@ -389,7 +389,7 @@ int main(int argc, char *argv[]){
             softSwitches(0xC0E9,0);                                  // drive0
             break;
 
-          case SDLK_F11:          puce6502Break();           break;  // break
+          case SDLK_F11:          puce6502Break();           break;  // break 
           case SDLK_F12:          running = false;           break;  // exit ...
 
           // EMULATED KEYS :
