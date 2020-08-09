@@ -15,7 +15,7 @@ After [reinette](https://github.com/ArthurFerreira2/reinette) (Apple 1 emulator)
 * all video modes in color
 * mono sound with mute/unmute
 * 48KB (no language card support)
-* paddles/joystic with trim ajustment
+* paddles/joystick with trim ajustment
 * paste text from clipboard
 * disk ][ adapter with two drives (.nib files only)
 * drag and drop nib files to inset a floppy
