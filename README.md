@@ -8,6 +8,8 @@ After [reinette](https://github.com/ArthurFerreira2/reinette) (Apple 1 emulator)
 
 \* reinette has two meanings in french : it's a little frog but also a delicious kind of apple
 
+[download link for windows binaries](https://github.com/ArthurFerreira2/reinette-II-plus/releases/tag/0.1b)
+
 ### Featuring :
 
 * all video modes in color
