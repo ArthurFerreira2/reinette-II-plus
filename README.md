@@ -78,7 +78,7 @@ Paddles / Joystic :
 * HGR video is inaccurate, and does not implement color clashing
 * disk ][ access is artificially accelerated
 * only support .nib floppy images. (you can use [CiderPress](https://github.com/fadden/ciderpress) to convert your images to this format)
-* only has 48KB of RAM (can't run some software requiring the language card)
+* only has 48KB of RAM (can't run software requiring the language card)
 * and many others ...
 
 
