@@ -125,7 +125,7 @@ uint8_t softSwitches(uint16_t address, uint8_t value){
       if (!MUTED){
         uint16_t length = (ticks - lastTick) / rate;
         if (length > audioBufferSize) length = audioBufferSize;
-        ticks -= length << 2;                                // speed up
+        ticks -= length << 2;                                // speed up CPU
         lastTick = ticks;
         SDL_QueueAudio(audioDevice, audioBuffer[SPKR], length);
       }
@@ -194,55 +194,96 @@ uint8_t softSwitches(uint16_t address, uint8_t value){
 int main(int argc, char *argv[]){
 
   // VM INITIALIZATION
-  FILE *f = fopen("appleII+.rom", "rb");    // load the Apple II+ ROM
-  fread(rom, 1, ROMSIZE, f);
-  fclose(f);
 
-  f=fopen("diskII.rom", "rb");                  // load the disk ][ PROM
-  fread(slot6, 1, 256, f);
-  fclose(f);
+  FILE *f = fopen("appleII+.rom", "rb");       // load the Apple II+ ROM
+  if (f){
+    if (fread(rom, 1, ROMSIZE, f) != ROMSIZE){
+      printf("appleII+.rom should be 12 K Bytes\n");
+      return(1);
+    }
+    fclose(f);
+  }
+  else {
+    printf("Could not open appleII+.rom\n");
+    return(2);
+  }
 
-  if (argc == 2){                              // load .nib in drive 0
+  f = fopen("diskII.rom", "rb");               // load the disk ][ PROM
+  if (f){
+    if (fread(slot6, 1, 256, f) != 256){
+      printf("diskII.rom should be 256 Bytes\n");
+      return(3);
+    }
+    fclose(f);
+  }
+  else {
+    printf("Could not open diskII.rom\n");
+    return(4);
+  }
+
+  if (argc > 1){                               // load .nib in drive 0
     f = fopen(argv[1], "rb");                  // open it in read binary
-    fread(disk[0].data, 1, 232960, f);
-    fclose(f);
-    f = fopen(argv[1], "ab");                  // check if file is writeable
-    disk[0].readOnly = f ? false : true;       // f will be NULL if open failed
-    fclose(f);
-    sprintf(disk[0].filename,"%s", argv[1]);   // update disk filename
+    if (f){
+      if (fread(disk[0].data, 1, 232960, f) != 232960){
+        printf("This floppy image should be 232960 Bytes\n");
+        return(5);
+      }
+      fclose(f);
+      sprintf(disk[0].filename,"%s", argv[1]); // update disk filename
+
+      f = fopen(argv[1], "ab");                // check if file is writeable
+      if (f){
+        disk[0].readOnly = true;               // f will be NULL if open failed
+        fclose(f);
+      }
+      else disk[0].readOnly = false;
+    }
   }
 
   puce6502Reset();                             // reset the 6502
 
+
   // SDL INITIALIZATION
+
   int zoom = 2;
-  SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+  char title[1024] = "reinette II+";
+
+  if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[DEBUG] > %s", SDL_GetError());
+    return(10);
+  }
+
   SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 
-  SDL_Window *wdo = SDL_CreateWindow("reinette II+", SDL_WINDOWPOS_CENTERED, \
+  SDL_Window *wdo = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, \
                  SDL_WINDOWPOS_CENTERED, 280*zoom, 192*zoom, SDL_WINDOW_OPENGL);
 
   SDL_Renderer *rdr = SDL_CreateRenderer(wdo, -1, SDL_RENDERER_ACCELERATED);
+
   SDL_SetRenderDrawBlendMode(rdr, SDL_BLENDMODE_BLEND);
   SDL_RenderSetScale(rdr, zoom, zoom);
 
   const int frameDelay = 1000/60;    // targeting 60 FPS
   Uint32 frameStart = 0, frameTime = 0, frame = 0;
   SDL_Event event;
-  bool running = true, ctrl, shift, alt;
+  bool paused = false, running = true, ctrl, shift, alt;
+
 
   // SDL AUDIO INITIALIZATION
+
   SDL_AudioSpec wavSpec = {20000, AUDIO_U8, 1, 0, 8, 0, 0, NULL, NULL};
   audioDevice = SDL_OpenAudioDevice(NULL, 0, &wavSpec, NULL, 0);
   SDL_PauseAudioDevice(audioDevice, MUTED);
 
   // two audio buffers, one when the speaker is 'on', the other when it's 'off'
   for (int i=0; i<audioBufferSize; i++){
-    audioBuffer[true][i] = 32;   // when SPKR==true : 1/8 of max amplitude (255)
-    audioBuffer[false][i] = 0;   // when SPKR==false : silence
+    audioBuffer[true][i] = 32;        // when SPKR==true : 1/8 of max amplitude
+    audioBuffer[false][i] = 0;        // when SPKR==false : silence
   }
 
+
   // LOAD NORMAL AND REVERSE CHARACTERS BITMAPS
+
   SDL_Surface *tmpSurface = SDL_LoadBMP("font-normal.bmp");
   SDL_Texture *normCharTexture = SDL_CreateTextureFromSurface(rdr, tmpSurface);
   SDL_FreeSurface(tmpSurface);
@@ -251,8 +292,11 @@ int main(int argc, char *argv[]){
   SDL_Texture *revCharTexture = SDL_CreateTextureFromSurface(rdr, tmpSurface);
   SDL_FreeSurface(tmpSurface);
 
+
   // VARIABLES USED IN THE VIDEO PRODUCTION
+
   uint16_t previousDots[192][40]={0}; // check which Hi-Res 7 dots needs redraw
+  int previousBit[192][40]={0};       // the dot value of the byte before.
   uint8_t  glyph;                     // a TEXT character, or 2 blocks in GR
   uint16_t vRamBase = 0x0400;         // can be 0x0400, 0x0800, 0x2000 or 0x4000
   uint8_t  colorIdx = 0;              // to index the color arrays
@@ -265,10 +309,11 @@ int main(int argc, char *argv[]){
     charRects[c].w = 7;
     charRects[c].h = 8;
   }
-  SDL_Rect drvRect[2] = {             // disk drive 1 status square
+  SDL_Rect drvRect[2] = {             // disk drive status squares
     {272, 188, 4, 4}, {276, 188, 4, 4}};
 
   enum characterAttribute {A_NORMAL, A_INVERSE, A_FLASH} glyphAttribute;
+  bool MONOCHROME = false;
 
   const int color[16][3] = {         // the 16 low res colors
     {  0,   0,   0}, {226,  57,  86}, { 28, 116,205}, {126, 110, 173},
@@ -277,12 +322,12 @@ int main(int argc, char *argv[]){
     {144, 192,  49}, {255, 253, 166}, {159, 210,213}, {255, 255, 255}};
 
   const int hcolor[8][3] = {         // the high res colors (2 color sets)
-    {  0,   0,   0}, {126, 110, 173}, {144, 192,  49}, {255, 255, 255},
-    {  0,   0,   0}, { 86, 168, 228}, {234, 108,  21}, {255, 255, 255}};
+    {  0,   0,   0}, {144, 192,  49}, {126, 110, 173}, {255, 255, 255},
+    {  0,   0,   0}, {234, 108,  21}, { 86, 168, 228}, {255, 255, 255}};
 
-  const int hhcolor[8][3] = {        // the high res 2nd half pixel, darker
-    { 10,  10,  10}, {116, 100, 163}, {134, 182,  39}, {245, 245, 245},
-    { 10,  10,  10}, { 76, 158, 218}, {224,  98,  11}, {245, 245, 245}};
+  const int dhcolor[8][3] = {        // the high res 2nd half pixel, darker
+    {  0,   0,   0}, { 63,  55,  86}, { 72,  96,  25}, {255, 255, 255},
+    {  0,   0,   0}, { 43,  84, 114}, {117,  54,  10}, {255, 255, 255}};
 
   const int offsetGR[24] = {         // helper for TEXT and GR video generation
     0x000, 0x080, 0x100, 0x180, 0x200, 0x280, 0x300, 0x380,   // lines 0-7
@@ -320,12 +365,21 @@ int main(int argc, char *argv[]){
   //================================================================== MAIN LOOP
 
   while (running){
-    frameStart = SDL_GetTicks();
+
+    frameStart = SDL_GetTicks();                    // start of a new frame
+
 
     //================================================================== RUN CPU
-    puce6502Exec(16666);  // execute 1000000/60 cycles at each frame
+
+    if (!paused){
+      puce6502Exec(16666); // execute 1000000/60 cycles at each frame
+      if (disk[curDrv].motorOn)                     // drive is active
+        puce6502Exec(500000);                       // artificial drive speed up
+    }
+
 
     //=========================================================== KEYBOARD INPUT
+
     while (SDL_PollEvent(&event)){
 
       ctrl  = SDL_GetModState() & KMOD_CTRL  ? true : false;
@@ -334,32 +388,79 @@ int main(int argc, char *argv[]){
       PB0   = alt   ? 0xFF : 0x00;                  // update push button 0
       PB1   = ctrl  ? 0xFF : 0x00;                  // update push button 1
 
+
       if (event.type == SDL_QUIT) running = false;  // WM sent TERM signal
 
+
       if (event.type == SDL_DROPFILE){              // user dropped a file
+
         char* filename = event.drop.file;           // get full pathname
         f = fopen(filename, "rb");                  // open it in read binary
-        fread(disk[alt].data, 1, 232960, f);        // if alt : drv 1 else drv 0
-        fclose(f);
-        f = fopen(filename, "ab");                  // check file is writeable
-        disk[alt].readOnly = f ? false : true;      // f is NULL if open failed
-        fclose(f);
+        if (f){
+          fread(disk[alt].data, 1, 232960, f);      // if ALT : drv 1 else drv 0
+          fclose(f);
+        }
+
+        f = fopen(filename, "ab");                  // check if file is writable
+        if (f) {
+          disk[alt].readOnly = true;                // f is NULL if open failed
+          fclose(f);
+        }
+        else disk[alt].readOnly = false;
+
         sprintf(disk[alt].filename,"%s", filename); // update disk filename
         SDL_free(filename);                         // free filename memory
-        if (!alt) puce6502Goto(0xC600);
+
+        int i, a, b;                                // updates window title
+        i = a = 0;
+        while (disk[0].filename[i] != 0)            // find start of filename
+          if (disk[0].filename[i++] == '\\') a = i; // for disk0
+        i = b = 0;
+        while (disk[1].filename[i] != 0)            // find start of filename
+          if (disk[1].filename[i++] == '\\') b = i; // for disk1
+        sprintf(title, "reinette II+   D1: %s   D2: %s", \
+                disk[0].filename + a, disk[1].filename + b);
+
+        SDL_SetWindowTitle(wdo, title);             // set the title
+        paused = false;                             // might already be the case
+        if (!alt) puce6502Goto(0xC600);             // force reboot
       }
 
+
       if (event.type == SDL_KEYDOWN)                // a key has been pressed
+
         switch (event.key.keysym.sym){
 
           // EMULATOR CONTROL :
-          case SDLK_F1:                             // save curDrv back to host
-            if (disk[curDrv].filename[0] && !disk[curDrv].readOnly)
-              if((f = fopen(disk[curDrv].filename, "wb"))){
-                fwrite(disk[curDrv].data, 1, 232960, f);
+
+          case SDLK_F1:                            // save disk 0 back to host
+            if (disk[0].filename[0] && !disk[0].readOnly){
+              f = fopen(disk[0].filename, "wb");
+              if (f){
+                if (fwrite(disk[0].data, 1, 232960, f) != 232960){
+                  printf("Write failed\n");
+                  return(20);
+                }
                 fclose(f);
               }
+            }
             break;
+
+          case SDLK_F2:                             // save disk 1 back to host
+            if (disk[1].filename[0] && !disk[1].readOnly){
+              f = fopen(disk[1].filename, "wb");
+              if (f){
+                if (fwrite(disk[1].data, 1, 232960, f) != 232960){
+                  printf("Write failed\n");
+                  return(21);
+                }
+                fclose(f);
+              }
+            }
+            break;
+
+
+          case SDLK_F3:           paused = !paused;          break;  //
 
           case SDLK_F4:                             // paste txt from clipboard
             if (SDL_HasClipboardText()){
@@ -374,23 +475,32 @@ int main(int argc, char *argv[]){
             }
             break;
 
+
           case SDLK_F5: if ((zoom-=2) < 0) zoom = 0;                 // zoom out
           case SDLK_F6: if (++zoom > 8) zoom = 8;                    // zoom in
             SDL_SetWindowSize(wdo, 280*zoom, 192*zoom);
             SDL_RenderSetScale(rdr, zoom, zoom);             break;
 
+
           case SDLK_F7:           trimGC -= .01;             break;  // PDL Trim
           case SDLK_F8:           trimGC += .01;             break;  // PDL Trim
+
           case SDLK_F9:           MUTED = !MUTED;            break;  // mute
 
-          case SDLK_F10:                                             // reset
-            puce6502Reset();
-            softSwitches(0xC0E8,0);                                  // motorOff
-            softSwitches(0xC0E9,0);                                  // drive0
+          case SDLK_F10:          MONOCHROME = !MONOCHROME;  break;  //
+
+          case SDLK_F11:                                             // reset
+            if (ctrl)
+              puce6502Break();
+            else {
+              puce6502Reset();
+              softSwitches(0xC0E8,0);                                // motorOff
+              softSwitches(0xC0E9,0);                                // drive0En
+            }
             break;
 
-          case SDLK_F11:          puce6502Break();           break;  // break 
-          case SDLK_F12:          running = false;           break;  // exit ...
+          case SDLK_F12:          running = false;           break;  // goodbye
+
 
           // EMULATED KEYS :
           case SDLK_ESCAPE:       KBD = 0x9B;                break;  // ESC
@@ -463,63 +573,82 @@ int main(int argc, char *argv[]){
         }
     }
 
+
     //============================================================= VIDEO OUTPUT
 
     //======================================================== HIGH RES GRAPHICS
+
     if (HIRES){
-      vRamBase = PAGE * 0x2000;             // PAGE is 1 or 2
-      int word, bits[16], bit, colorShift;
+      int word, bits[16], bit, pbit, colorSet;
+      bool even;
+
+      vRamBase = PAGE * 0x2000;               // PAGE is 1 or 2
 
       for (int line=0; line<TEXT*8; line++){  // for every line
-        int y = line;
-        for (int col=0; col<40; col += 2){  // for every 7 horizontal dots
+        for (int col=0; col<40; col += 2){    // for every 7 horizontal dots
           int x = col * 7;
+          even = true;
 
           // put the two next bytes into one word (in reverse order)
-          word =  (uint16_t)(ram[ vRamBase + offsetHGR[line] + col + 1 ]) << 8;
-          word += ram[ vRamBase + offsetHGR[line] + col ];
+          word = (uint16_t)(ram[ vRamBase + offsetHGR[line] + col + 1 ]) << 8;
+          word +=           ram[ vRamBase + offsetHGR[line] + col ];
 
-          // check if this group of 7 dots need a redraw (ie were modified)
-          // or redraw all screen every 1/2 second (every 30 frames)
+          // check if this group of 7 dots need a redraw (ie was modified)
           if (previousDots[line][col] != word || frame == 0){
-            previousDots[line][col] = word;
 
             // store all bits of the word into the bits array
             for (bit=0; bit<16; bit++) bits[bit] = (word >> bit) & 1;
 
-            colorShift = bits[7] * 4;       // select the right colorset
-            bit = 1;                        // starting at 2nd bit
+            colorSet = bits[7] * 4;           // select the right color set
+            pbit = previousBit[line][col];
+            bit = 0;                          // starting at 1st bit of 1st byte
 
-            while (bit < 15){               // until we reach bit7 of 2nd byte
-                                            // color clashing is not implemented
-              if (bit == 7){                // into the second byte
-                colorShift=bits[15]*4;      // update the color set
-                bit = 8;                    // skip bit 7
-                colorIdx = colorShift + (bits[8] << 1) + bits[6];
+            while (bit < 15){                 // until we reach bit7 of 2nd byte
+
+              if (bit == 7){                  // moving into the second byte
+                colorSet = bits[15] * 4;      // update the color set
+                pbit = bits[6];
+                bit++;                        // skip bit 7
               }
+
+              if (MONOCHROME)
+                colorIdx = bits[bit] * 3;
               else
-                colorIdx = colorShift + (bits[bit] << 1) + bits[bit - 1];
+                colorIdx = colorSet + (bits[bit] << 1) + (pbit);
 
-              // plot first half dot
-              SDL_SetRenderDrawColor(rdr, hcolor[colorIdx][0], \
+              if (even)
+                SDL_SetRenderDrawColor(rdr, hcolor[colorIdx][0], \
                   hcolor[colorIdx][1], hcolor[colorIdx][2], SDL_ALPHA_OPAQUE);
-              SDL_RenderDrawPoint(rdr, x, y);
+              else
+                SDL_SetRenderDrawColor(rdr, dhcolor[colorIdx][0], \
+                  dhcolor[colorIdx][1], dhcolor[colorIdx][2], SDL_ALPHA_OPAQUE);
 
-              // plot second half dot, using slightly darker colors
-              SDL_SetRenderDrawColor(rdr, hhcolor[colorIdx][0],
-                  hhcolor[colorIdx][1], hhcolor[colorIdx][2], SDL_ALPHA_OPAQUE);
-              SDL_RenderDrawPoint(rdr, x + 1, y);
+              SDL_RenderDrawPoint(rdr, x, line);
 
-              x += 2;                       // proceed to the next dot
-              bit += 2;
+              x++;                            // proceed to the next dot
+              pbit = bits[bit];
+              bit++;
+              even = !even;
+            } // while (bit < 15)
+
+            previousDots[line][col] = word; // update the video cache
+
+            if ((col < 37) && (previousBit[line][col + 2] != pbit)){
+              previousBit[line][col + 2] = pbit;   // check for color franging
+              previousDots[line][col + 2] = -1;
             }
-          }
+
+          } // if (previousDots[line][col] ...
         }
       }
-    }
+    } // if (HIRES)
+
+
+
 
     //========================================================= lOW RES GRAPHICS
-    else if (TEXT != 0){                                    // not in full text
+
+    else if (TEXT){                                         // not in full text
       vRamBase = PAGE * 0x0400;
       for (int col=0; col<40; col++){                       // for each column
         pixelGR.x = col * 7;
@@ -530,19 +659,21 @@ int main(int argc, char *argv[]){
 
           colorIdx = glyph & 0x0F;                          // first nibble
           SDL_SetRenderDrawColor(rdr, color[colorIdx][0], \
-            color[colorIdx][1], color[colorIdx][2], SDL_ALPHA_OPAQUE);
+              color[colorIdx][1], color[colorIdx][2], SDL_ALPHA_OPAQUE);
           SDL_RenderFillRect(rdr, &pixelGR);
 
           pixelGR.y += 4;                                   // second block
           colorIdx = (glyph & 0xF0) >> 4;                   // second nibble
           SDL_SetRenderDrawColor(rdr, color[colorIdx][0], \
-            color[colorIdx][1], color[colorIdx][2], SDL_ALPHA_OPAQUE);
+              color[colorIdx][1], color[colorIdx][2], SDL_ALPHA_OPAQUE);
           SDL_RenderFillRect(rdr, &pixelGR);
         }
       }
     }
 
+
     //========================================================== TEXT 40 COLUMNS
+
     if (TEXT != 24){
       vRamBase = PAGE * 0x0400;
       for (int col=0; col<40; col++){                       // for each column
@@ -568,25 +699,33 @@ int main(int argc, char *argv[]){
         }
       }
     }
+
+
     //====================================================== DISPLAY DISK STATUS
+
     if (disk[curDrv].motorOn){                              // drive is active
       if (disk[curDrv].writeMode)
         SDL_SetRenderDrawColor(rdr, 255, 0, 0, 85);         // red for writes
       else
         SDL_SetRenderDrawColor(rdr, 0, 255, 0, 85);         // green for reads
+
       SDL_RenderFillRect(rdr, &drvRect[curDrv]);
-      puce6502Exec(100000);                                 // drive speed up
     }
 
     //========================================================= SDL RENDER FRAME
+
     if (++frame == 30) frame = 0;                           // 1/2 second timer
+
     frameTime = SDL_GetTicks() - frameStart;                // frame duration
     if (frameDelay > frameTime) SDL_Delay(frameDelay - frameTime); // wait vsync
+
     SDL_RenderPresent(rdr);                                 // swap buffers
 
   } // while (running)
 
+
   //================================================ RELEASE RESSOURSES AND EXIT
+
   SDL_AudioQuit();
   SDL_Quit();
   return(0);

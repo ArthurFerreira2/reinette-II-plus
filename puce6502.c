@@ -25,6 +25,7 @@
 */
 
 #include "puce6502.h"
+#include <stdio.h>
 
 // function to be provided by user to handle read and writes to locations not
 // in ROM or in RAM : Soft Switches, extension cards ROMs, PIA, VIA, ACIA etc...
@@ -43,7 +44,8 @@ extern uint8_t softSwitches(uint16_t address, uint8_t value);
 struct Operand {
   uint8_t code;
   bool setAcc;
-  uint16_t value, address;
+  uint8_t value;
+  uint16_t address;
 } ope;
 
 struct Register {
@@ -52,14 +54,10 @@ struct Register {
 } reg;
 
 
-// 	instruction timing :
-//  http://nparker.llx.com/a2/opcodes.html
-//  http://wouter.bbcmicro.net/general/6502/6502_opcodes.html
-
-// IMPLEMENTED :
-// The conditional branch instructions require a second extra cycle if the
-// branch happens and crosses a page boundary.
-
+// instruction timing :
+//    http://nparker.llx.com/a2/opcodes.html
+//    http://wouter.bbcmicro.net/general/6502/6502_opcodes.html
+//
 // NOT IMPLEMENTED :
 // Absolute-X, absolute-Y, and Zpage-Y addressing modes need an extra cycle
 // if indexing crosses a page boundary, or if the instruction writes to memory.
@@ -551,4 +549,21 @@ void puce6502Break() {
 
 void puce6502Goto(uint16_t address) {
   reg.PC = address;
+}
+
+void puce6502DumpRegs() {
+  printf("\nPC:%04X  A:%02X  X:%02X  Y:%02X  SP:%02X  SR:%02X", reg.PC ,reg.A, reg.X, reg.Y, reg.SP, reg.SR);
+  printf("\nCARRY:%d ZERO:%d INTR:%d DECIM:%d BREAK:%d OFLOW:%d SIGN:%d\n\n", reg.SR&CARRY,  reg.SR&ZERO, reg.SR&INTR, reg.SR&DECIM, reg.SR&BREAK, reg.SR&OFLOW, reg.SR&SIGN);
+}
+
+void puce6502DumpPage(uint8_t page, uint8_t pageCount) {
+  if (page + pageCount >= RAMSIZE/0xFF) return;
+  printf("Page %02X\n", page);
+  for (int i=page*0xFF; i<(page+pageCount)*0xFF; i+=0x10) {
+    printf("%04X : ", i);
+    for (int j=i; j<i+0x10; j++) printf("%02X ", ram[j]);
+    printf(": ");
+    for (int j=i; j<i+0x10; j++) printf("%c", ram[j]>32 ? ram[j] : ' ');
+    printf("\n");
+  }
 }

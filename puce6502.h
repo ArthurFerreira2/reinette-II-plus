@@ -42,4 +42,7 @@ void puce6502Exec(long long int cycleCount);
 void puce6502Reset();
 void puce6502Break();
 void puce6502Goto(uint16_t address);
+void puce6502DumpRegs();
+void puce6502DumpPage(uint8_t page, uint8_t pageCount);
+
 #endif

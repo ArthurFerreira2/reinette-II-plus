@@ -8,7 +8,7 @@ After [reinette](https://github.com/ArthurFerreira2/reinette) (Apple 1 emulator)
 
 \* reinette has two meanings in french : it's a little frog but also a delicious kind of apple
 
-[download link for windows binaries](https://github.com/ArthurFerreira2/reinette-II-plus/releases/tag/0.1b)
+[download windows binaries](https://github.com/ArthurFerreira2/reinette-II-plus/releases/tag/0.2b)
 
 ### Featuring :
 
@@ -18,9 +18,9 @@ After [reinette](https://github.com/ArthurFerreira2/reinette) (Apple 1 emulator)
 * paddles/joystick with trim adjustment
 * paste text from clipboard
 * disk ][ adapter with two drives (.nib files only)
-* drag and drop nib files to inset a floppy
+* drag and drop .nib files to inset a floppy
 * save floppy changes back to host
-* zoom the window by integer increments
+* screen scaling by integer increments
 
 
 It uses the same MOS 6502 CPU emulator as her sisters (now christened [puce6502](https://github.com/ArthurFerreira2/puce6502)).\
@@ -39,25 +39,28 @@ I did my best to comment the code, and if you have an idea of how an Apple ][ wo
 
 ### Startup
 
-  You can specify a .nib file on the command line to start the emulator with a floppy engaged in drive 1. Otherwhise, the emulator will start with no floppy (and thus wait one until you press the reset key or drag and drop a nib file)
+  You can specify a .nib file on the command line to start the emulator with a floppy engaged in drive 1. Otherwise, the emulator will start with no floppy (and thus wait one until you press the reset key or drag and drop a .nib file)
 
 
 ### Usage
 
-Drag and drop a disk image file (.nib format only) to inset it into drive 1\
+Drag and drop a disk image file (.nib format only) to insert it into drive 1\
 Drop the file while pressing the ALT key to insert it into drive 2
 
 Use the functions keys to control the emulator itself
 ```
-* F1    : writes the changes of the floppy in current drive back to host
+* F1    : writes the changes of the floppy in drive 0 back to host
+* F2    : writes the changes of the floppy in drive 1 back to host
+* F3    : pause / un-pause the emulator
 * F4    : paste text from clipboard
-* F5    : zoom out down to 1:1
+* F5    : zoom out down to 1:1 pixels
 * F6    : zoom in, no magnification limit
-* F7/F8 : adjust joystic trim
-* F9    : mute/unmute soud
-* F10   : reset
-* F11   : break
-* F12   : quit (you can also just close the window)
+* F7/F8 : adjust joystick trim
+* F9    : mute / un-mute sound
+* F10   : monochrome / color display (only in HGR mode)
+* F11   : reset
+* CTRL-F11 : break
+* F12   : quit the emulator
 
 Paddles / Joystic :
 
@@ -71,32 +74,32 @@ Paddles / Joystic :
 
 ### Limitations
 
-* high pitch noise at high volume (might be related with my environment)
+* high pitch noise at high volume on windows (Linux Ubuntu tested OK)
 * sound cracks when playing for long period (intro music for example)
 * CPU is not 100% cycle accurate - see source file for more details
 * colors are approximate (taken from a scan of an old Beagle bros. poster)
-* HGR video is inaccurate, and does not implement color clashing
+* ~~HGR video is inaccurate, and does not implement color fringing~~
 * disk ][ access is artificially accelerated
 * only support .nib floppy images. (you can use [CiderPress](https://github.com/fadden/ciderpress) to convert your images to this format)
 * only has 48KB of RAM (can't run software requiring the language card)
 * and many others ...
 
 
-### To do :
+### To do
 
 * give a warning if the application exits with unsaved floppy changes
 * give the user the option to start with the original Apple II rom
 * colors where taken from an old Beagle Bros poster, find more accurate RGB values.
-* implement color clashing in HGR
+* ~~implement color fringe effect in HGR~~
 * optimize sound generation
 * optimize disk access (speed is actually a bit artificial)
-* re-implement Paddles and Joystic support for a better analog simulation
-* implement the language card and  extend the RAM of **reinette II plus** to 64K to support more sofware.
+* re-implement Paddles and Joystick support for analog simulation
+* implement the language card and extend the RAM of **reinette II plus** to 64K to support more software.
 * for 6502 coders :
   * add the ability to insert a binary file at a specified address
-  * dump regs, soft swithes and specified memory pages to console
+  * dump regs, soft switches and specified memory pages to console
 
-Follow me to keep updated !
+Follow me to be updated !
 \
 \
 \
