@@ -30,7 +30,6 @@
 #include "puce6502.h"
 
 
-
 //================================================================ SOFT SWITCHES
 
 uint8_t KBD   = 0;                                                              // 0xC000, 0xC010 ascii value of keyboard input
@@ -54,12 +53,13 @@ float   trimGC = .24;                                                           
 double rate = 23.19727891156463;                                                // 1023000 Hz / 44100 Hz  (the wavSpec.freq)
 bool muted = false;                                                             // press F9 to mute/unmute
 SDL_AudioDeviceID audioDevice;
-Sint8 audioBuffer[2][audioBufferSize] = {0};                                      // see main() for more details
+Sint8 audioBuffer[2][audioBufferSize] = {0};                                    // see main() for more details
 
 
 //====================================================================== DISK ][
 
 uint8_t slot6[256] = {0};                                                       // P5A disk ][ PROM in slot 6
+int curDrv = 0;                                                                 // only one can be enabled at a time
 
 struct drive{
   char filename[512];                                                           // the full disk image path
@@ -70,8 +70,6 @@ struct drive{
   uint8_t track;                                                                // current track position
   uint16_t nibble;                                                              // ptr to nibble under head position
 } disk[2] = {0};                                                                // two disk ][ drive units
-
-int curDrv = 0;                                                                 // only one can be enabled at a time
 
 
 int insertFloppy(SDL_Window *wdo, char *filename, int drv){
@@ -113,6 +111,19 @@ int insertFloppy(SDL_Window *wdo, char *filename, int drv){
   return(1);
 }
 
+int saveFloppy(int drive){
+  if (disk[drive].filename[0] && !disk[drive].readOnly){
+    FILE *f = fopen(disk[drive].filename, "wb");
+    if (f){
+      if (fwrite(disk[drive].data, 1, 232960, f) != 232960){
+        printf("Write failed\n");
+        return(0);
+      }
+      fclose(f);
+    }
+  }
+  return(1);
+}
 
 void stepMotor(uint16_t address){
   static bool phases[2][4]   = {0};                                             // phases states (for both drives)
@@ -244,7 +255,7 @@ int main(int argc, char *argv[]){
   int zoom = 2;
   const float frameDelay = 1000/60;                                             // targeting 60 FPS
   float fps = 60;
-  Uint32 frameStart = 0, frameTime = 0, frame = 0, reftime = 0, blink = 0;
+  Uint32 frameStart = 0, frameTime = 0, frame = 0, reftime = 0;
   SDL_Event event;
   bool paused = false, running = true, ctrl, shift, alt;
 
@@ -258,9 +269,9 @@ int main(int argc, char *argv[]){
   SDL_Window *wdo = SDL_CreateWindow("reinette II+", SDL_WINDOWPOS_CENTERED, \
                  SDL_WINDOWPOS_CENTERED, 280*zoom, 192*zoom, SDL_WINDOW_OPENGL);
 
-   SDL_Surface *icon = SDL_LoadBMP("icon.bmp");                                 // add an icon to the window title bar
-   SDL_SetColorKey(icon, SDL_TRUE, SDL_MapRGB(icon->format, 255, 255, 255));
-   SDL_SetWindowIcon(wdo, icon);
+  SDL_Surface *icon = SDL_LoadBMP("icon.bmp");                                  // add an icon to the window title bar
+  SDL_SetColorKey(icon, SDL_TRUE, SDL_MapRGB(icon->format, 255, 255, 255));
+  SDL_SetWindowIcon(wdo, icon);
 
   SDL_Renderer *rdr = SDL_CreateRenderer(wdo, -1, SDL_RENDERER_ACCELERATED);    // | SDL_RENDERER_PRESENTVSYNC);
   SDL_SetRenderDrawBlendMode(rdr, SDL_BLENDMODE_NONE);                          // SDL_BLENDMODE_BLEND);
@@ -294,12 +305,13 @@ int main(int argc, char *argv[]){
 
   uint16_t previousDots[192][40] = {0};                                         // check which Hi-Res 7 dots needs redraw
   int previousBit[192][40] = {0};                                               // the last bit value of the byte before.
-  uint8_t glyph;                                                                // a TEXT character, or 2 blocks in GR
-  uint8_t colorIdx = 0;                                                         // to index the color arrays
-  uint16_t vRamBase = 0x0400;                                                   // can be 0x0400, 0x0800, 0x2000 or 0x4000
   int lineLimit;
-  enum characterAttribute {A_NORMAL, A_INVERSE, A_FLASH} glyphAttribute;
+  uint8_t glyph;                                                                // a TEXT character, or 2 blocks in GR
+  bool blink = true;                                                            // cursor blinking
+  uint8_t colorIdx = 0;                                                         // to index the color arrays
   bool monochrome = false;
+  uint16_t vRamBase = 0x0400;                                                   // can be 0x0400, 0x0800, 0x2000 or 0x4000
+  enum characterAttribute {A_NORMAL, A_INVERSE, A_FLASH} glyphAttribute;
 
   SDL_Rect drvRect[2] = { {272, 188, 4, 4}, {276, 188, 4, 4} };                 // disk drive status squares
   SDL_Rect pixelGR = {0, 0, 7, 4};                                              // a block in LoRes
@@ -318,7 +330,7 @@ int main(int argc, char *argv[]){
     {151,  88,  34}, {234, 108,  21}, {158, 151,143}, {255, 206, 240},
     {144, 192,  49}, {255, 253, 166}, {159, 210,213}, {255, 255, 255}};
 
-  const int hcolor[16][3] = {                                                   // the high res colors (2 lights)
+  const int hcolor[16][3] = {                                                   // the high res colors (2 light levels)
     {  0,   0,   0}, {144, 192,  49}, {126, 110, 173}, {255, 255, 255},
     {  0,   0,   0}, {234, 108,  21}, { 86, 168, 228}, {255, 255, 255},
     {  0,   0,   0}, { 63,  55,  86}, { 72,  96,  25}, {255, 255, 255},
@@ -434,60 +446,39 @@ int main(int argc, char *argv[]){
       }
 
       if (event.type == SDL_KEYDOWN)                                            // a key has been pressed
-
         switch (event.key.keysym.sym){
 
           // EMULATOR CONTROL :
 
-          case SDLK_F1:                                                         // save disk 0 back to host
-            if (disk[0].filename[0] && !disk[0].readOnly){
-              f = fopen(disk[0].filename, "wb");
-              if (f){
-                if (fwrite(disk[0].data, 1, 232960, f) != 232960){
-                  printf("Write failed\n");
-                }
-                fclose(f);
-              }
-            }
-            break;
+          case SDLK_F1: saveFloppy(0); break;                                   // save disk 0 back to host
+          case SDLK_F2: saveFloppy(1); break;                                   // save disk 1 back to host
 
-          case SDLK_F2:                                                         // save disk 1 back to host
-            if (disk[1].filename[0] && !disk[1].readOnly){
-              f = fopen(disk[1].filename, "wb");
-              if (f){
-                if (fwrite(disk[1].data, 1, 232960, f) != 232960){
-                  printf("Write failed\n");
-                }
-                fclose(f);
-              }
-            }
-            break;
-
-          case SDLK_F3:           paused = !paused;          break;             // pause / un-pause
-
-          case SDLK_F4:                                                         // paste txt from clipboard
-            if (SDL_HasClipboardText()){
-              char *clipboardText = SDL_GetClipboardText();
-              int c = 0;
-              while (clipboardText[c]){                                         // all chars until ascii NUL
-                KBD = clipboardText[c++] | 0x80;                                // set bit7
-                if (KBD == 0x8A) KBD = 0x8D;                                    // Line Feed to Carriage Ret
-                puce6502Exec(400000);                                           // to process each char
-              }
-              SDL_free(clipboardText);
-            }
-            break;
-
-          case SDLK_F5: if ((zoom-=2) < 0) zoom = 0;                            // zoom out
-          case SDLK_F6: if (++zoom > 8) zoom = 8;                               // zoom in
+          case SDLK_F3: if ((zoom-=2) < 0) zoom = 0;                            // zoom out
+          case SDLK_F4: if (++zoom > 8) zoom = 8;                               // zoom in
             SDL_SetWindowSize(wdo, 280*zoom, 192*zoom);
-            SDL_RenderSetScale(rdr, zoom, zoom);             break;
+            SDL_RenderSetScale(rdr, zoom, zoom);
+            break;
 
-          case SDLK_F7:           trimGC -= .01;             break;             // PDL Trim
-          case SDLK_F8:           trimGC += .01;             break;             // PDL Trim
+          case SDLK_F5: trimGC -= .01; break;                                   // PDL Trim
+          case SDLK_F6: trimGC += .01; break;                                   // PDL Trim
 
-          case SDLK_F9:           muted = !muted;            break;             // mute
-          case SDLK_F10:          monochrome = !monochrome;  break;             // ...
+          case SDLK_F7:                                                         // paste txt from clipboard
+          if (SDL_HasClipboardText()){
+            char *clipboardText = SDL_GetClipboardText();
+            int c = 0;
+            while (clipboardText[c]){                                           // all chars until ascii NUL
+              KBD = clipboardText[c++] | 0x80;                                  // set bit7
+              if (KBD == 0x8A) KBD = 0x8D;                                      // Line Feed to Carriage Ret
+              puce6502Exec(400000);                                             // to process each char
+            }
+            SDL_free(clipboardText);
+          }
+          break;
+
+          case SDLK_F8:  muted      = !muted;      break;                       // mute
+          case SDLK_F9:  monochrome = !monochrome; break;                       // ...
+          case SDLK_F10: paused     = !paused;     break;                       // pause / un-pause
+          case SDLK_F12: running    = false;       break;                       // goodbye
 
           case SDLK_F11:                                                        // reset
             if (ctrl)
@@ -498,8 +489,6 @@ int main(int argc, char *argv[]){
               softSwitches(0xC0E8,0);                                           // motorOff
             }
             break;
-
-          case SDLK_F12:          running = false;           break;             // goodbye
 
           // EMULATED KEYS :
 
@@ -592,7 +581,7 @@ int main(int argc, char *argv[]){
           word = (uint16_t)(ram[ vRamBase + offsetHGR[line] + col + 1 ]) << 8;  // put the two next bytes into one word (in reverse order)
           word +=           ram[ vRamBase + offsetHGR[line] + col ];
                                                                                 // check if this group of 7 dots need a redraw (ie was modified)
-          if (previousDots[line][col] != word || !blink){                       // or refresh the full screen every 1/2 second (everytime blink is reset to 0)
+          if (previousDots[line][col] != word || !frame){                       // or refresh the full screen every 1 second
 
             for (bit=0; bit<16; bit++) bits[bit] = (word >> bit) & 1;           // store all bits of the word into the 'bits' array
 
@@ -680,7 +669,7 @@ int main(int argc, char *argv[]){
           if (glyph > 0x5F) glyph &= 0x3F;                                      // shifts to match
           if (glyph < 0x20) glyph |= 0x40;                                      // the ASCII codes
 
-          if (glyphAttribute == A_NORMAL || blink < 15)
+          if (glyphAttribute == A_NORMAL || blink)
             SDL_RenderCopy(rdr, normCharTexture, &charRects[glyph], &dstRect);
           else
             SDL_RenderCopy(rdr, revCharTexture,  &charRects[glyph], &dstRect);
@@ -708,14 +697,13 @@ int main(int argc, char *argv[]){
     }                                                                           // else, skip frame
 
     frame++;
-    if (frameStart > reftime + 1000){
+    if (frame > 30) blink = false;
+    if (frameStart >= reftime + 1000){
       fps = (float)(frame * 1000.0) / (float)(frameStart - reftime);
-      // printf("TIME:%d  FPS:%f FRAME:%d\n", frameStart - reftime, fps, frame);
-      frame = 0;
       reftime = SDL_GetTicks();
+      frame = 0;
+      blink = true;
     }
-
-    if (++blink == 30) blink = 0;
 
   }  // while (running)
 
