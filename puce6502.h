@@ -1,7 +1,14 @@
 /*
+
   Puce6502 - MOS 6502 cpu emulator
   Last modified 1st of August 2020
   Copyright (c) 2018 Arthur Ferreira (arthur.ferreira2@gmail.com)
+
+  This version has been modified for reinette II plus, a french Apple II plus
+  emulator using SDL2 (https://github.com/ArthurFerreira2/reinette-II-plus).
+
+  Please download the latest version from
+  https://github.com/ArthurFerreira2/puce6502
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -20,6 +27,7 @@
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
   THE SOFTWARE.
+
 */
 
 #ifndef _CPU_H
@@ -42,7 +50,5 @@ void puce6502Exec(long long int cycleCount);
 void puce6502Reset();
 void puce6502Break();
 void puce6502Goto(uint16_t address);
-void puce6502DumpRegs();
-void puce6502DumpPage(uint8_t page, uint8_t pageCount);
 
 #endif

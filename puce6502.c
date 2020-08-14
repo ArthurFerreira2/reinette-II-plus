@@ -4,6 +4,12 @@
   Last modified 1st of August 2020
   Copyright (c) 2018 Arthur Ferreira (arthur.ferreira2@gmail.com)
 
+  This version has been modified for reinette II plus, a french Apple II plus
+  emulator using SDL2 (https://github.com/ArthurFerreira2/reinette-II-plus).
+
+  Please download the latest version from
+  https://github.com/ArthurFerreira2/puce6502
+
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
   in the Software without restriction, including without limitation the rights
@@ -543,27 +549,13 @@ void puce6502Exec(long long int cycleCount){
   }
 }
 
+
+//=================================================== ADDED FOR REINETTE II PLUS
+
 void puce6502Break() {
   BRK();
 }
 
 void puce6502Goto(uint16_t address) {
   reg.PC = address;
-}
-
-void puce6502DumpRegs() {
-  printf("\nPC:%04X  A:%02X  X:%02X  Y:%02X  SP:%02X  SR:%02X", reg.PC ,reg.A, reg.X, reg.Y, reg.SP, reg.SR);
-  printf("\nCARRY:%d ZERO:%d INTR:%d DECIM:%d BREAK:%d OFLOW:%d SIGN:%d\n\n", reg.SR&CARRY,  reg.SR&ZERO, reg.SR&INTR, reg.SR&DECIM, reg.SR&BREAK, reg.SR&OFLOW, reg.SR&SIGN);
-}
-
-void puce6502DumpPage(uint8_t page, uint8_t pageCount) {
-  if (page + pageCount >= RAMSIZE/0xFF) return;
-  printf("Page %02X\n", page);
-  for (int i=page*0xFF; i<(page+pageCount)*0xFF; i+=0x10) {
-    printf("%04X : ", i);
-    for (int j=i; j<i+0x10; j++) printf("%02X ", ram[j]);
-    printf(": ");
-    for (int j=i; j<i+0x10; j++) printf("%c", ram[j]>32 ? ram[j] : ' ');
-    printf("\n");
-  }
 }
