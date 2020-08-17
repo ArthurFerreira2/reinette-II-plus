@@ -32,28 +32,48 @@
 
 //================================================================ SOFT SWITCHES
 
-uint8_t KBD   = 0;                                                              // 0xC000, 0xC010 ascii value of keyboard input
-bool    SPKR  = false;                                                          // 0xC030 Speaker toggle
-bool    TEXT  = true;                                                           // 0xC050 CLRTEXT  / 0xC051 SETTEXT
-bool    MIXED = false;                                                          // 0xC052 CLRMIXED / 0xC053 SETMIXED
-uint8_t PAGE  = 1;                                                              // 0xC054 PAGE1    / 0xC055 PAGE2
-bool    HIRES = false;                                                          // 0xC056 GR       / 0xC057 HGR
-uint8_t PB0   = 0;                                                              // 0xC061 Push Button 0 (bit 7) / Open Apple
-uint8_t PB1   = 0;                                                              // 0xC062 Push Button 1 (bit 7) / Solid Apple
-uint8_t PB2   = 0;                                                              // 0xC063 Push Button 2 (bit 7) / shift mod !!!
-uint8_t GC0   = 0;                                                              // 0xC064 Game Controller 0 (bit 7)
-uint8_t GC1   = 0;                                                              // 0xC065 Game Controller 1 (bit 7)
-float   TGC0, TGC1;                                                             // Timers for GC0 and GC1
-float   trimGC = .24;                                                           // Game Controller trim use F5 and F6 to adjust it
+uint8_t KBD   = 0;                                                              // $C000, $C010 ascii value of keyboard input
+bool    SPKR  = false;                                                          // $C030 Speaker toggle
+bool    TEXT  = true;                                                           // $C050 CLRTEXT  / $C051 SETTEXT
+bool    MIXED = false;                                                          // $C052 CLRMIXED / $C053 SETMIXED
+uint8_t PAGE  = 1;                                                              // $C054 PAGE1    / $C055 PAGE2
+bool    HIRES = false;                                                          // $C056 GR       / $C057 HGR
+
+
+//====================================================================== PADDLES
+
+uint8_t PB0  = 0;                                                               // $C061 Push Button 0 (bit 7) / Open Apple
+uint8_t PB1  = 0;                                                               // $C062 Push Button 1 (bit 7) / Solid Apple
+uint8_t PB2  = 0;                                                               // $C063 Push Button 2 (bit 7) / shift mod !!!
+float GCP[2] = {127, 127};                                                      // GC Position ranging from 0 (left) to 255 right
+float GCC[2] = {0};                                                             // GC0 and GC1 Countdown
+int   GCD[2] = {0};                                                             // GC0 and GC1 Directions (left/down or right/up)
+int   GCA[2] = {0};                                                             // GC0 and GC1 Action (push or release)
+uint8_t GCActionSpeed = 16;                                                     // Game Controller speed at which it goes to the edges
+uint8_t GCReleaseSpeed = 16;                                                    // Game Controller speed at which it returns to center
+const float  GCFreq = 0.15;                                                     // the freq at which the 556 timer decreases the GC values
+long long int GCCrigger;                                                        // the tick at which the GCs have been reseted
+
+
+inline float paddle(int pdl){
+  GCC[pdl] -= (ticks - GCCrigger) * GCFreq;
+  if (GCC[pdl] < 0) GCC[pdl] = 0;
+  return(GCC[pdl]);
+}
+
+inline void resetPaddles(){
+  GCC[0] = GCP[0] * GCP[0];
+  GCC[1] = GCP[1] * GCP[1];
+  GCCrigger = ticks;
+}
 
 
 //======================================================================== AUDIO
 
-#define audioBufferSize 512                                                     // found to be large enought
-double rate = 23.19727891156463;                                                // 1023000 Hz / 44100 Hz  (the wavSpec.freq)
-bool muted = false;                                                             // press F9 to mute/unmute
-SDL_AudioDeviceID audioDevice;
+#define audioBufferSize 4096                                                    // found to be large enought
 Sint8 audioBuffer[2][audioBufferSize] = {0};                                    // see main() for more details
+SDL_AudioDeviceID audioDevice;
+bool muted = false;                                                             // mute/unmute
 
 
 //====================================================================== DISK ][
@@ -112,17 +132,17 @@ int insertFloppy(SDL_Window *wdo, char *filename, int drv){
 }
 
 int saveFloppy(int drive){
-  if (disk[drive].filename[0] && !disk[drive].readOnly){
+  if (disk[drive].filename[0] && !disk[drive].readOnly){                        // is there's a floppy ? is it writable ?
     FILE *f = fopen(disk[drive].filename, "wb");
-    if (f){
-      if (fwrite(disk[drive].data, 1, 232960, f) != 232960){
+    if (f){                                                                     // open in write/binary succeeded
+      if (fwrite(disk[drive].data, 1, 232960, f) != 232960){                    // check we could write the full lenght
         printf("Write failed\n");
-        return(0);
+        return(0);                                                              // failed to write
       }
-      fclose(f);
+      fclose(f);                                                                // release the ressource
     }
   }
-  return(1);
+  return(1);                                                                    // success
 }
 
 void stepMotor(uint16_t address){
@@ -160,7 +180,7 @@ void stepMotor(uint16_t address){
 
 //========================================== MEMORY MAPPED SOFT SWITCHES HANDLER
 // this function is called from readMem and writeMem in puce6502
-// it complements both functions when address is between 0xC000 and 0xCFFF
+// it complements both functions when address 1is between 0xC000 and 0xCFFF
 
 uint8_t softSwitches(uint16_t address, uint8_t value){
   static uint8_t dLatch = 0;                                                    // disk ][ I/O reg
@@ -174,13 +194,13 @@ uint8_t softSwitches(uint16_t address, uint8_t value){
 
     case 0xC020:                                                                // TAPEOUT (shall we listen it ?)
     case 0xC030:                                                                // SPEAKER
-    case 0xC033:                                                                // apple invader
+    case 0xC033:                                                                // apple invader uses it to output sound !
       if (!muted){
-        SPKR = !SPKR;                                                           // toggle speaker
-        Uint32 length = (ticks - lastTick) / rate;
+        SPKR = !SPKR;                                                           // toggle speaker state
+        Uint32 length = (ticks - lastTick) / 10.65625;                          // 1023000Hz / 96000Hz = 10.65625
         lastTick = ticks;
         if (length > audioBufferSize) length = audioBufferSize;
-        SDL_QueueAudio(audioDevice, audioBuffer[SPKR], length);
+        SDL_QueueAudio(audioDevice, audioBuffer[SPKR], length | 1);             // | 1 TO HEAR HIGH FREQ SOUNDS
       }
       break;
 
@@ -196,9 +216,9 @@ uint8_t softSwitches(uint16_t address, uint8_t value){
     case 0xC061: return(PB0);                                                   // Push Button 0
     case 0xC062: return(PB1);                                                   // Push Button 1
     case 0xC063: return(PB2);                                                   // Push Button 2
-    case 0xC064: return((TGC0-=trimGC) > 192? 0x80: 0x00);                      // Paddle 0
-    case 0xC065: return((TGC1-=trimGC) > 192? 0x80: 0x00);                      // Paddle 1
-    case 0xC070: TGC0 = GC0; TGC1 = GC1; break;                                 // paddle timer RST
+    case 0xC064: return(paddle(0) != 0 ? 0x80: 0x00);                           // Paddle 0
+    case 0xC065: return(paddle(1) != 0 ? 0x80: 0x00);                           // Paddle 1
+    case 0xC070: resetPaddles(); break;                                         // paddle timer RST
 
     case 0xC0E0:                                                                // PHASE0OFF
     case 0xC0E1:                                                                // PHASE0ON
@@ -228,7 +248,7 @@ uint8_t softSwitches(uint16_t address, uint8_t value){
         disk[curDrv].data[disk[curDrv].track*0x1A00+disk[curDrv].nibble]=dLatch;
       else                                                                      // reading
         dLatch=disk[curDrv].data[disk[curDrv].track*0x1A00+disk[curDrv].nibble];
-      disk[curDrv].nibble = (disk[curDrv].nibble+1)%0x1A00;                     // turn floppy
+      disk[curDrv].nibble = (disk[curDrv].nibble + 1) % 0x1A00;                 // turn floppy
       return(dLatch);
 
     case 0xC0ED: dLatch = value; break;                                         // Load Data Latch
@@ -239,11 +259,12 @@ uint8_t softSwitches(uint16_t address, uint8_t value){
 
     case 0xC0EF: disk[curDrv].writeMode = true; break;                          // latch for WRITE
 
-    default: printf("Uncaught Soft Switch access at %04X\n", address);
+    // default: printf("Uncaught Soft Switch access at %04X\n", address);
   }
 
   return(0);                                                                    // catch all
 }
+
 
 
 //========================================================== PROGRAM ENTRY POINT
@@ -253,25 +274,22 @@ int main(int argc, char *argv[]){
   // SDL INITIALIZATION
 
   int zoom = 2;
-  const float frameDelay = 1000/60;                                             // targeting 60 FPS
-  float fps = 60;
-  Uint32 frameStart = 0, frameTime = 0, frame = 0, reftime = 0;
+  const double frameDelay = 1000.0 / 60.0;                                      // targeting 60 FPS
+  double fps = 60;
+  Uint32 frameStart = 0, frameTime = 0, frame = 0;
+  uint8_t tries = 0;                                                            // disk ][ speed-up
   SDL_Event event;
-  bool paused = false, running = true, ctrl, shift, alt;
+  SDL_bool paused = false, running = true, ctrl, shift, alt;
 
   if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[DEBUG] > %s", SDL_GetError());
-    return(10);
+    return(-1);
   }
 
   SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 
   SDL_Window *wdo = SDL_CreateWindow("reinette II+", SDL_WINDOWPOS_CENTERED, \
                  SDL_WINDOWPOS_CENTERED, 280*zoom, 192*zoom, SDL_WINDOW_OPENGL);
-
-  SDL_Surface *icon = SDL_LoadBMP("icon.bmp");                                  // add an icon to the window title bar
-  SDL_SetColorKey(icon, SDL_TRUE, SDL_MapRGB(icon->format, 255, 255, 255));
-  SDL_SetWindowIcon(wdo, icon);
 
   SDL_Renderer *rdr = SDL_CreateRenderer(wdo, -1, SDL_RENDERER_ACCELERATED);    // | SDL_RENDERER_PRESENTVSYNC);
   SDL_SetRenderDrawBlendMode(rdr, SDL_BLENDMODE_NONE);                          // SDL_BLENDMODE_BLEND);
@@ -280,38 +298,36 @@ int main(int argc, char *argv[]){
 
   // SDL AUDIO INITIALIZATION
 
-  SDL_AudioSpec desired = {44100, AUDIO_S8, 1, 0, 4096, 0, 0, NULL, NULL};
+  SDL_AudioSpec desired = {96000, AUDIO_S8, 1, 0, 4096, 0, 0, NULL, NULL};
   audioDevice = SDL_OpenAudioDevice(NULL, 0, &desired, NULL, SDL_FALSE);
   SDL_PauseAudioDevice(audioDevice, muted);
 
-  for (int i=0; i<audioBufferSize; i++){                                        // two audio buffers, one when the speaker is 'on', the other when it's 'off'
-    audioBuffer[true][i]  = 127;                                                // when SPKR==true : 1/2 of max amplitude
-    audioBuffer[false][i] = 0;                                                  // when SPKR==false : silence
+  for (int i=1; i<audioBufferSize; i++){                                        // two audio buffers,
+    audioBuffer[true][i]  =  120;                                               // one used when SPKR is true
+    audioBuffer[false][i] = -120;                                               // the other when SPKR is false
   }
-
 
   // LOAD NORMAL AND REVERSE CHARACTERS BITMAPS
 
-  SDL_Surface *tmpSurface = SDL_LoadBMP("font-normal.bmp");
+  SDL_Surface *tmpSurface = SDL_LoadBMP("assets/font-normal.bmp");              // load the normal font
   SDL_Texture *normCharTexture = SDL_CreateTextureFromSurface(rdr, tmpSurface);
   SDL_FreeSurface(tmpSurface);
 
-  tmpSurface = SDL_LoadBMP("font-reverse.bmp");
+  tmpSurface = SDL_LoadBMP("assets/font-reverse.bmp");                          // load the reverse font
   SDL_Texture *revCharTexture = SDL_CreateTextureFromSurface(rdr, tmpSurface);
   SDL_FreeSurface(tmpSurface);
 
 
   // VARIABLES USED IN THE VIDEO PRODUCTION
 
+  uint16_t vRamBase = 0x0400;                                                   // can be $400, $800, $2000 or $4000
   uint16_t previousDots[192][40] = {0};                                         // check which Hi-Res 7 dots needs redraw
-  int previousBit[192][40] = {0};                                               // the last bit value of the byte before.
-  int lineLimit;
+  uint8_t previousBit[192][40] = {0};                                           // the last bit value of the byte before.
+  uint8_t lineLimit;
   uint8_t glyph;                                                                // a TEXT character, or 2 blocks in GR
-  bool blink = true;                                                            // cursor blinking
   uint8_t colorIdx = 0;                                                         // to index the color arrays
   bool monochrome = false;
-  uint16_t vRamBase = 0x0400;                                                   // can be 0x0400, 0x0800, 0x2000 or 0x4000
-  enum characterAttribute {A_NORMAL, A_INVERSE, A_FLASH} glyphAttribute;
+  enum characterAttribute {A_NORMAL, A_INVERSE, A_FLASH} glyphAttr;             // character attribute in TEXT
 
   SDL_Rect drvRect[2] = { {272, 188, 4, 4}, {276, 188, 4, 4} };                 // disk drive status squares
   SDL_Rect pixelGR = {0, 0, 7, 4};                                              // a block in LoRes
@@ -370,51 +386,45 @@ int main(int argc, char *argv[]){
 
     // VM INITIALIZATION
 
-    FILE *f = fopen("appleII+.rom", "rb");                                      // load the Apple II+ ROM
+    FILE *f = fopen("rom/appleII+.rom", "rb");                                  // load the Apple II+ ROM
     if (!f){
-      printf("Could not open appleII+.rom\n");
-      return(1);
+      printf("Could not open appleII+.rom\n");                                  // file not found
+      return(1);                                                                // exit
     }
-    if (fread(rom, 1, ROMSIZE, f) != ROMSIZE){
-      printf("appleII+.rom should be 12KB\n");
-      return(1);
+    if (fread(rom, 1, ROMSIZE, f) != ROMSIZE){                                  // the file is too small
+      printf("appleII+.rom should be 12 KB\n");
+      return(1);                                                                // exit
     }
     fclose(f);
 
-    f = fopen("diskII.rom", "rb");                                              // load the P5A disk ][ PROM
+    f = fopen("rom/diskII.rom", "rb");                                          // load the P5A disk ][ PROM
     if (!f){
-      printf("Could not open diskII.rom\n");
-      return(1);
+      printf("Could not open diskII.rom\n");                                    // file not found
+      return(1);                                                                // exit
     }
-    if (fread(slot6, 1, 256, f) != 256){
+    if (fread(slot6, 1, 256, f) != 256){                                        // file too small
       printf("diskII.rom should be 256 Bytes\n");
-      return(1);
+      return(1);                                                                // exit
     }
     fclose(f);
 
-    if (argc > 1) insertFloppy(wdo, argv[1], 0);                                // load .nib in drive 0
+    if (argc > 1) insertFloppy(wdo, argv[1], 0);                                // load .nib in parameter into drive 0
 
     puce6502Reset();                                                            // reset the 6502
 
 
-
   //================================================================== MAIN LOOP
-
-  reftime = SDL_GetTicks();
 
   while (running){
 
     frameStart = SDL_GetTicks();                                                // start of a new frame
 
     if (!paused){
-      puce6502Exec((long long int)(1023000.0 / fps));                           // adjusted ~1M/60 to the actual frame rate
-      int i;
-      i = 0;
-      while (disk[curDrv].motorOn && i < 50){                                   // until motor is off or i reaches 50
+      puce6502Exec((long long int)(1023000.0 / fps));                           // using actualized frame rate
+      while (disk[curDrv].motorOn && ++tries)                                   // until motor is off or i reaches 255+1=0
         puce6502Exec(10000);                                                    // artificial drive speed up
-        i++;
-      }
     }
+
 
     //=============================================================== USER INPUT
 
@@ -422,14 +432,14 @@ int main(int argc, char *argv[]){
 
       alt   = SDL_GetModState() & KMOD_ALT   ? true : false;
       ctrl  = SDL_GetModState() & KMOD_CTRL  ? true : false;
-      shift = SDL_GetModState() & KMOD_SHIFT ? true : false;;
+      shift = SDL_GetModState() & KMOD_SHIFT ? true : false;
       PB0   = alt   ? 0xFF : 0x00;                                              // update push button 0
       PB1   = ctrl  ? 0xFF : 0x00;                                              // update push button 1
       PB2   = shift ? 0xFF : 0x00;                                              // update push button 2
 
       if (event.type == SDL_QUIT) running = false;                              // WM sent TERM signal
 
-      // if (event.type == SDL_WINDOWEVENT){
+      // if (event.type == SDL_WINDOWEVENT){                                       // pause if the window loses focus
       //   if(event.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
       //     paused = true;
       // if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED)
@@ -455,12 +465,12 @@ int main(int argc, char *argv[]){
 
           case SDLK_F3: if ((zoom-=2) < 0) zoom = 0;                            // zoom out
           case SDLK_F4: if (++zoom > 8) zoom = 8;                               // zoom in
-            SDL_SetWindowSize(wdo, 280*zoom, 192*zoom);
+            SDL_SetWindowSize(wdo, 280 * zoom, 192 * zoom);
             SDL_RenderSetScale(rdr, zoom, zoom);
             break;
 
-          case SDLK_F5: trimGC -= .01; break;                                   // PDL Trim
-          case SDLK_F6: trimGC += .01; break;                                   // PDL Trim
+          case SDLK_F5: if (GCReleaseSpeed > 1  ) GCReleaseSpeed -= 2; break;  // PDL Trim
+          case SDLK_F6: if (GCReleaseSpeed < 127) GCReleaseSpeed += 2; break;  // PDL Trim
 
           case SDLK_F7:                                                         // paste txt from clipboard
           if (SDL_HasClipboardText()){
@@ -492,13 +502,6 @@ int main(int argc, char *argv[]){
 
           // EMULATED KEYS :
 
-          case SDLK_ESCAPE:       KBD = 0x9B;                break;             // ESC
-          case SDLK_RETURN:       KBD = 0x8D;                break;             // CR
-          case SDLK_DELETE:       KBD = 0x80;                break;             // DEL->NUL
-          case SDLK_LEFT:         KBD = 0x88;                break;             // BS
-          case SDLK_RIGHT:        KBD = 0x95;                break;             // NAK
-          case SDLK_BACKSPACE:    KBD = 0x88;                break;             // BS
-          case SDLK_SPACE:        KBD = 0xA0;                break;
           case SDLK_a:            KBD = ctrl ? 0x81: 0xC1;   break;             // a
           case SDLK_b:            KBD = ctrl ? 0x82: 0xC2;   break;             // b STX
           case SDLK_c:            KBD = ctrl ? 0x83: 0xC3;   break;             // c ETX
@@ -525,6 +528,11 @@ int main(int argc, char *argv[]){
           case SDLK_x:            KBD = ctrl ? 0x98: 0xD8;   break;             // x CANCEL
           case SDLK_y:            KBD = ctrl ? 0x99: 0xD9;   break;             // y
           case SDLK_z:            KBD = ctrl ? 0x9A: 0xDA;   break;             // z
+          case SDLK_RETURN:       KBD = ctrl ? 0x8A: 0x8D;   break;             // LF CR
+          case SDLK_LEFTBRACKET:  KBD = ctrl ? 0x9B: 0xDB;   break;             // [ {
+          case SDLK_BACKSLASH:    KBD = ctrl ? 0x9C: 0xDC;   break;             // \ |
+          case SDLK_RIGHTBRACKET: KBD = ctrl ? 0x9D: 0xDD;   break;             // ] }
+          case SDLK_BACKSPACE:    KBD = ctrl ? 0xDF: 0x88;   break;             // BS
           case SDLK_0:            KBD = shift? 0xA9: 0xB0;   break;             // 0 )
           case SDLK_1:            KBD = shift? 0xA1: 0xB1;   break;             // 1 !
           case SDLK_2:            KBD = shift? 0xC0: 0xB2;   break;             // 2
@@ -542,26 +550,40 @@ int main(int argc, char *argv[]){
           case SDLK_PERIOD:       KBD = shift? 0xBE: 0xAE;   break;             // . >
           case SDLK_SLASH:        KBD = shift? 0xBF: 0xAF;   break;             // / ?
           case SDLK_MINUS:        KBD = shift? 0xDF: 0xAD;   break;             // - _
-          case SDLK_LEFTBRACKET:  KBD = shift? 0xFB: 0xDB;   break;             // [ {
-          case SDLK_BACKSLASH:    KBD = shift? 0xFC: 0xDC;   break;             // \ |
-          case SDLK_RIGHTBRACKET: KBD = shift? 0xFD: 0xDD;   break;             // ] }
           case SDLK_BACKQUOTE:    KBD = shift? 0xFE: 0xE0;   break;             // ` ~
+          case SDLK_LEFT:         KBD = 0x88;                break;             // BS
+          case SDLK_RIGHT:        KBD = 0x95;                break;             // NAK
+          case SDLK_SPACE:        KBD = 0xA0;                break;
+          case SDLK_ESCAPE:       KBD = 0x9B;                break;
 
-          // EMULATED JOYSTICK
+          // EMULATED JOYSTICK :
 
-          case SDLK_KP_1:         GC0 = 192;                 break;             // pdl0 <-
-          case SDLK_KP_3:         GC0 = 255;                 break;             // pdl0 ->
-          case SDLK_KP_5:         GC1 = 192;                 break;             // pdl1 <-
-          case SDLK_KP_2:         GC1 = 255;                 break;             // pdl1 ->
+          case SDLK_KP_1:         GCD[0] = -1; GCA[0] = 1;   break;             // pdl0 <-
+          case SDLK_KP_3:         GCD[0] =  1; GCA[0] = 1;   break;             // pdl0 ->
+          case SDLK_KP_5:         GCD[1] = -1; GCA[1] = 1;   break;             // pdl1 <-
+          case SDLK_KP_2:         GCD[1] =  1; GCA[1] = 1;   break;             // pdl1 ->
         }
 
       if (event.type == SDL_KEYUP)
         switch (event.key.keysym.sym){
-          case SDLK_KP_1:         GC0 = 224;                 break;             // reset
-          case SDLK_KP_3:         GC0 = 224;                 break;             // the
-          case SDLK_KP_5:         GC1 = 224;                 break;             // paddles
-          case SDLK_KP_2:         GC1 = 224;                 break;             // to center
+          case SDLK_KP_1:         GCD[0] =  1; GCA[0] = 0;   break;             // pdl0 ->
+          case SDLK_KP_3:         GCD[0] = -1; GCA[0] = 0;   break;             // pdl0 <-
+          case SDLK_KP_5:         GCD[1] =  1; GCA[1] = 0;   break;             // pdl1 ->
+          case SDLK_KP_2:         GCD[1] = -1; GCA[1] = 0;   break;             // pdl1 <-
         }
+    }
+
+    for (int pdl=0; pdl<2; pdl++){                                              // update the two paddles positions
+      if (GCA[pdl]) {                                                           // actively pushing the stick
+        GCP[pdl] += GCD[pdl] * GCActionSpeed;
+        if (GCP[pdl] > 255) GCP[pdl] = 255;
+        if (GCP[pdl] < 0  ) GCP[pdl] = 0;
+      }
+      else {                                                                    // the stick is return back to center
+        GCP[pdl] += GCD[pdl] * GCReleaseSpeed;
+        if (GCD[pdl] ==  1 && GCP[pdl] > 127) GCP[pdl] = 127;
+        if (GCD[pdl] == -1 && GCP[pdl] < 127) GCP[pdl] = 127;
+      }
     }
 
     //============================================================= VIDEO OUTPUT
@@ -569,7 +591,8 @@ int main(int argc, char *argv[]){
     // HIGH RES GRAPHICS
 
     if (!TEXT && HIRES){
-      int word, bits[16], bit, pbit, colorSet, even;
+      uint16_t word;
+      uint8_t bits[16], bit, pbit, colorSet, even;
       vRamBase = PAGE * 0x2000;                                                 // PAGE is 1 or 2
       lineLimit = MIXED ? 160 : 192;
 
@@ -578,43 +601,38 @@ int main(int argc, char *argv[]){
           int x = col * 7;
           even = 0;
 
-          word = (uint16_t)(ram[ vRamBase + offsetHGR[line] + col + 1 ]) << 8;  // put the two next bytes into one word (in reverse order)
-          word +=           ram[ vRamBase + offsetHGR[line] + col ];
-                                                                                // check if this group of 7 dots need a redraw (ie was modified)
-          if (previousDots[line][col] != word || !frame){                       // or refresh the full screen every 1 second
+          word = (uint16_t)(ram[ vRamBase + offsetHGR[line] + col + 1 ]) << 8;  // store the two next bytes into 'word'
+          word +=           ram[ vRamBase + offsetHGR[line] + col ];            // in reverse order
 
-            for (bit=0; bit<16; bit++) bits[bit] = (word >> bit) & 1;           // store all bits of the word into the 'bits' array
-
+          if (previousDots[line][col] != word || !frame){                       // check if this group of 7 dots need a redraw
+                                                                                // or refresh the full screen every 1/2 second
+            for (bit=0; bit<16; bit++)                                          // store all bits 'word' into 'bits'
+              bits[bit] = (word >> bit) & 1;
             colorSet = bits[7] * 4;                                             // select the right color set
             pbit = previousBit[line][col];                                      // the bit value of the left dot
             bit = 0;                                                            // starting at 1st bit of 1st byte
 
             while (bit < 15){                                                   // until we reach bit7 of 2nd byte
-
               if (bit == 7){                                                    // moving into the second byte
                 colorSet = bits[15] * 4;                                        // update the color set
                 bit++;                                                          // skip bit 7
               }
-
               if (monochrome)
                 colorIdx = bits[bit] * 3;                                       // black if bit==0, white if bit==1
               else
                 colorIdx = even + colorSet + (bits[bit] << 1) + (pbit);
-
               SDL_SetRenderDrawColor(rdr, hcolor[colorIdx][0], \
                 hcolor[colorIdx][1], hcolor[colorIdx][2], SDL_ALPHA_OPAQUE);
               SDL_RenderDrawPoint(rdr, x++, line);
-
               pbit = bits[bit++];                                               // proceed to the next pixel
               even = even ? 0 : 8;                                              // one pixel every two is darker
             }
 
             previousDots[line][col] = word;                                     // update the video cache
-            if ((col < 37) && (previousBit[line][col + 2] != pbit)){            // check it this dot has a color franging effect on the next dot
+            if ((col < 37) && (previousBit[line][col + 2] != pbit)){            // check color franging effect on the dot after
               previousBit[line][col + 2] = pbit;                                // set pbit and clear the
               previousDots[line][col + 2] = -1;                                 // video cache for next dot
             }
-
           }  // if (previousDots[line][col] ...
         }
       }
@@ -622,7 +640,7 @@ int main(int argc, char *argv[]){
 
     // lOW RES GRAPHICS
 
-    else if (!TEXT){                                                            // not in text
+    else if (!TEXT){                                                            // and not in HIRES
       vRamBase = PAGE * 0x0400;
       lineLimit = MIXED ? 20 : 24;
 
@@ -660,16 +678,16 @@ int main(int argc, char *argv[]){
 
           glyph = ram[vRamBase + offsetGR[line] + col];                         // read video memory
 
-          if (glyph > 0x7F) glyphAttribute = A_NORMAL;                          // is NORMAL ?
-          else if (glyph < 0x40) glyphAttribute = A_INVERSE;                    // is INVERSE ?
-          else glyphAttribute = A_FLASH;                                        // it's FLASH !
+          if (glyph > 0x7F) glyphAttr = A_NORMAL;                               // is NORMAL ?
+          else if (glyph < 0x40) glyphAttr = A_INVERSE;                         // is INVERSE ?
+          else glyphAttr = A_FLASH;                                             // it's FLASH !
 
           glyph &= 0x7F;                                                        // unset bit 7
 
           if (glyph > 0x5F) glyph &= 0x3F;                                      // shifts to match
           if (glyph < 0x20) glyph |= 0x40;                                      // the ASCII codes
 
-          if (glyphAttribute == A_NORMAL || blink)
+          if (glyphAttr == A_NORMAL || (glyphAttr == A_FLASH && frame < 15))
             SDL_RenderCopy(rdr, normCharTexture, &charRects[glyph], &dstRect);
           else
             SDL_RenderCopy(rdr, revCharTexture,  &charRects[glyph], &dstRect);
@@ -690,20 +708,15 @@ int main(int argc, char *argv[]){
 
     //========================================================= SDL RENDER FRAME
 
+    if (++frame > 30) frame = 0;
+
     frameTime = SDL_GetTicks() - frameStart;                                    // frame duration
-    if (frameDelay > frameTime) {                                               // do we have time ?
+    if (frameTime < frameDelay) {                                               // do we have time ?
       SDL_Delay(frameDelay - frameTime);                                        // wait 'vsync'
       SDL_RenderPresent(rdr);                                                   // swap buffers
-    }                                                                           // else, skip frame
-
-    frame++;
-    if (frame > 30) blink = false;
-    if (frameStart >= reftime + 1000){
-      fps = (float)(frame * 1000.0) / (float)(frameStart - reftime);
-      reftime = SDL_GetTicks();
-      frame = 0;
-      blink = true;
+      frameTime = SDL_GetTicks() - frameStart;                                  // update frameTime
     }
+    fps = (frameDelay / (double)frameTime) * 60.0;                              // calculate the actual frame rate
 
   }  // while (running)
 

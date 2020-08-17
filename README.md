@@ -2,7 +2,7 @@
 
 ### reinette goes graphical !
 
-![screenshots](screenshots.png)
+![screenshots](assets/screenshots.png)
 
 After [reinette](https://github.com/ArthurFerreira2/reinette) (Apple 1 emulator) and [reinette II](https://github.com/ArthurFerreira2/reinette-II) (the text only Apple II emulator), I am proud to release **reinette II plus**, a French\* Apple II plus emulator using SDL2.
 
