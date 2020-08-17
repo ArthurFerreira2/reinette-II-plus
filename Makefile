@@ -1,11 +1,9 @@
 CC = gcc
-FLAGS = -std=c99 -pedantic -Wpedantic -Wall -O3
-# -Werror
+FLAGS = -std=c99 -pedantic -Wpedantic -Wall -O3 -Werror
 
 LIBS = -lSDL2
 # comment this line if you are under Linux :
-WIN32-LIBS = -lmingw32 -lSDL2main
-#-Wl,-subsystem,windows
+WIN32-LIBS = -lmingw32 -lSDL2main -Wl,-subsystem,windows
 
 # comment this line if you are under Linux :
 WIN32-RES = reinetteII+.res
