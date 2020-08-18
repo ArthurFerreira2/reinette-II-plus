@@ -8,7 +8,7 @@ After [reinette](https://github.com/ArthurFerreira2/reinette) (Apple 1 emulator)
 
 \* reinette has two meanings in French : it's a little frog but also a delicious kind of apple
 
-[download windows binaries](https://github.com/ArthurFerreira2/reinette-II-plus/releases/tag/0.2b)
+[download windows binaries](https://github.com/ArthurFerreira2/reinette-II-plus/releases/tag/0.3b)
 
 ### Featuring :
 
@@ -51,7 +51,7 @@ Use the functions keys to control the emulator itself :
 * F1    : writes the changes of the floppy in drive 0 back to host
 * F2    : writes the changes of the floppy in drive 1 back to host
 * F3    : zoom out down to 1:1 pixels
-* F4    : zoom in, no magnification limit
+* F4    : zoom in, max 8x
 * F5    : reduce joystick trim
 * F6    : increase joystick trim
 * F7    : paste text from clipboard
@@ -75,22 +75,22 @@ Paddles / Joystick :
 ### Limitations
 
 * ~~high pitch noise at high volume on windows (Linux Ubuntu tested OK)~~
-* sound cracks when playing for long period (intro music for example)
+* ~~sound cracks when playing for long period (intro music for example)~~
 * CPU is not 100% cycle accurate - see source file for more details
 * colors are approximate (taken from a scan of an old Beagle bros. poster)
 * ~~HGR video is inaccurate, and does not implement color fringing~~
-* disk ][ access is artificially accelerated - considered as a feature
+* ~~disk ][ access is artificially accelerated~~ - considered as a feature
 * only support .nib floppy images. (you can use [CiderPress](https://github.com/fadden/ciderpress) to convert your images to this format)
 * only has 48KB of RAM (can't run software requiring the language card)
 * and many others ...
 
 ### To do
 
-* fix sound cracks
+* ~~fix sound cracks~~
 * give a warning if the application exits with unsaved floppy changes
 * check for more accurate RGB values.
 * ~~implement color fringe effect in HGR~~
-* re-implement Paddles and Joystick support for analog simulation
+* ~~re-implement Paddles and Joystick support for analog simulation~~
 * implement the language card and extend the RAM of **reinette II plus** to 64K to support more software.
 * for 6502 coders :
   * add the ability to insert a binary file at a specified address
