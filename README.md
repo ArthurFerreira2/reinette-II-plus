@@ -8,7 +8,7 @@ After [reinette](https://github.com/ArthurFerreira2/reinette) (Apple 1 emulator)
 
 \* reinette has two meanings in French : it's a little frog but also a delicious kind of apple
 
-[download windows binaries](https://github.com/ArthurFerreira2/reinette-II-plus/releases/tag/0.4b)
+[download windows binaries](https://github.com/ArthurFerreira2/reinette-II-plus/releases/tag/0.4)
 
 ### Featuring :
 
