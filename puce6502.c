@@ -1,5 +1,4 @@
 /*
-
   puce6502 - MOS 6502 cpu emulator
   Last modified 1st of August 2020
   Copyright (c) 2018 Arthur Ferreira (arthur.ferreira2@gmail.com)
@@ -27,15 +26,16 @@
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
   THE SOFTWARE.
-
 */
 
 #include "puce6502.h"
-#include <stdio.h>
 
 // function to be provided by user to handle read and writes to locations not
 // in ROM or in RAM : Soft Switches, extension cards ROMs, PIA, VIA, ACIA etc...
-extern uint8_t softSwitches(uint16_t address, uint8_t value);
+extern uint8_t softSwitches(uint16_t address, uint8_t value, bool WRT);
+
+// these are the Language Card switches used in readMem and writeMem
+extern bool LCWR, LCRD, LCBK2;
 
 
 #define CARRY 0x01
@@ -60,15 +60,7 @@ struct Register {
 } reg;
 
 
-// instruction timing :
-//    http://nparker.llx.com/a2/opcodes.html
-//    http://wouter.bbcmicro.net/general/6502/6502_opcodes.html
-//
-// NOT IMPLEMENTED :
-// Absolute-X, absolute-Y, and Zpage-Y addressing modes need an extra cycle
-// if indexing crosses a page boundary, or if the instruction writes to memory.
-
-static int cycles[256] = {    // cycle count per instruction
+static int cycles[256] = { // cycles per instruction
   7,6,0,0,0,3,5,0,3,2,2,0,0,4,6,0,3,5,0,0,0,4,6,0,2,4,0,0,0,4,7,0,
   6,6,0,0,3,3,5,0,4,2,2,0,4,4,6,0,3,5,0,0,0,4,6,0,2,4,0,0,0,4,7,0,
   6,6,0,0,0,3,5,0,3,2,2,0,3,4,6,0,3,5,0,0,0,4,6,0,2,4,0,0,0,4,7,0,
@@ -83,14 +75,48 @@ static int cycles[256] = {    // cycle count per instruction
 //=============================================================== MEMORY AND I/O
 
 inline static uint8_t readMem(uint16_t address){
-  if (address <  RAMSIZE)  return(ram[address]);
-  if (address >= ROMSTART) return(rom[address - ROMSTART]);
-  return softSwitches(address, 0);                          // MEMORY MAPPED I/O
+  if (address < RAMSIZE)
+    return(ram[address]);                                                 // RAM
+
+  if (address >= ROMSTART){
+    if (!LCRD)
+      return(rom[address - ROMSTART]);                                    // ROM
+
+    if (LCBK2 && (address < 0xE000))
+      return(bk2[address - BK2START]);                                    // BK2
+
+    return(lgc[address - LGCSTART]);                                       // LC
+  }
+
+  if ((address & 0xFF00) == SL6START)
+    return(sl6[address - SL6START]); // disk][
+
+  if (address == 0xCFFF || ((address & 0xFF00) == 0xC000))
+    return(softSwitches(address, 0, false));
+
+  return(ticks % 256);                     // catch all, give a 'floating' value
 }
 
+
 inline static void writeMem(uint16_t address, uint8_t value){
-  if (address < RAMSIZE) ram[address] = value;
-  else if (address < ROMSTART) softSwitches(address, value);
+  if (address < RAMSIZE) {
+    ram[address] = value;                                                 // RAM
+    return;
+  }
+
+  if (LCWR && (address >= ROMSTART)){
+    if (LCBK2 && (address < 0xE000)){
+      bk2[address - BK2START] = value;                                    // BK2
+      return;
+    }
+    lgc[address - LGCSTART] = value;                                       // LC
+    return;
+  }
+
+  if (address == 0xCFFF || ((address & 0xFF00) == 0xC000)){
+    softSwitches(address, value, true);                         // Soft Switches
+    return;
+  }
 }
 
 
@@ -117,7 +143,7 @@ inline static void branch(){  // used by the 8 branch instructions
   reg.PC += ope.address;
 }
 
-inline static void makeUpdates(uint8_t val){ // used by ASL, LSR, ROL and ROR
+inline static void makeUpdates(uint8_t val){  // used by ASL, LSR, ROL and ROR
   if (ope.setAcc){
     reg.A = val;
     ope.setAcc = false;
@@ -153,6 +179,7 @@ static void ZPX(){  // Zero Page,X
 }
 
 static void ZPY(){  // Zero Page,Y
+  if (readMem(reg.PC) + reg.Y > 0xFF) ticks++;
   ope.address = (readMem(reg.PC++) + reg.Y) & 0xFF;
   ope.value = readMem(ope.address);
 }
@@ -169,12 +196,14 @@ static void ABS(){  // ABSolute
 }
 
 static void ABX(){  // ABsolute,X
+  if (readMem(reg.PC) + reg.X > 0xFF) ticks++;
   ope.address = (readMem(reg.PC) | (readMem(reg.PC + 1) << 8)) + reg.X;
   ope.value = readMem(ope.address);
   reg.PC += 2;
 }
 
 static void ABY(){  // ABsolute,Y
+  if (readMem(reg.PC) + reg.Y > 0xFF) ticks++;
   ope.address = (readMem(reg.PC) | (readMem(reg.PC + 1) << 8)) + reg.Y;
   ope.value = readMem(ope.address);
   reg.PC += 2;
@@ -212,7 +241,7 @@ void BRK(){  // BReaK
   push(reg.PC & 0xFF);
   push(reg.SR | BREAK);
   reg.SR |= INTR;
-  reg.PC = readMem(0xFFFE) | (readMem(0xFFFF) << 8);
+  reg.PC = readMem(0xFFFE) | ((readMem(0xFFFF) << 8)); // IRQ/BRK  FFFE	FFFF
 }
 
 static void CLD(){  // CLear Decimal
@@ -532,7 +561,7 @@ static void (*addressing[])(void) = {
 //========================================================= USER INTERFACE (API)
 
 void puce6502Reset(){
-  reg.PC = readMem(0xFFFC) | (readMem(0xFFFD) << 8);
+  reg.PC = readMem(0xFFFC) | (readMem(0xFFFD) << 8);  // RESET	  FFFC	FFFD
   reg.SP = 0xFF;
   reg.SR = (reg.SR | INTR) & ~DECIM;
   ope.setAcc = false;
@@ -552,10 +581,6 @@ void puce6502Exec(long long int cycleCount){
 
 //=================================================== ADDED FOR REINETTE II PLUS
 
-void puce6502Break() {
+void puce6502Break(){
   BRK();
-}
-
-void puce6502Goto(uint16_t address) {
-  reg.PC = address;
 }

@@ -1,5 +1,5 @@
 CC = gcc
-FLAGS = -std=c99 -pedantic -Wpedantic -Wall -O3 -Werror
+FLAGS = -std=c99 -pedantic -Wpedantic -Wall -O3
 
 LIBS = -lSDL2
 # comment this line if you are under Linux :
@@ -12,6 +12,6 @@ reinetteII+: reinetteII+.c puce6502.c $(WIN32-RES)
 	$(CC) $^ $(FLAGS) $(WIN32-LIBS) $(LIBS) -o $@
 
 reinetteII+.res: reinetteII+.rc
-	windres reinetteII+.rc -O coff -o $(WIN32-RES)
+	windres $^ -O coff -o $(WIN32-RES)
 
 all: reinetteII+

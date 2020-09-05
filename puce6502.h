@@ -30,25 +30,33 @@
 
 */
 
-#ifndef _CPU_H
-#define _CPU_H
+#ifndef _PUCE6502_H
+#define _PUCE6502_H
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef enum {false, true} bool;
 
+#define RAMSIZE  0xC000
 #define ROMSTART 0xD000
 #define ROMSIZE  0x3000
-#define RAMSIZE  0xC000
+#define LGCSTART 0xD000
+#define LGCSIZE  0x3000
+#define BK2START 0xD000
+#define BK2SIZE  0x1000
+#define SL6START 0xC600
+#define SL6SIZE  0x00FF
 
-uint8_t rom[ROMSIZE];
-uint8_t ram[RAMSIZE];
+uint8_t ram[RAMSIZE];  // 48K of ram in $000-$BFFF
+uint8_t rom[ROMSIZE];  // 12K of rom in $D000-$FFFF
+uint8_t lgc[LGCSIZE];  // Language Card 12K in $D000-$FFFF
+uint8_t bk2[BK2SIZE];  // bank 2 of Language Card 4K in $D000-$DFFF
+uint8_t sl6[SL6SIZE];  // P5A disk ][ PROM in slot 6
 
 long long int ticks;
 
 void puce6502Exec(long long int cycleCount);
 void puce6502Reset();
 void puce6502Break();
-void puce6502Goto(uint16_t address);
 
 #endif

@@ -8,19 +8,20 @@ After [reinette](https://github.com/ArthurFerreira2/reinette) (Apple 1 emulator)
 
 \* reinette has two meanings in French : it's a little frog but also a delicious kind of apple
 
-[download windows binaries](https://github.com/ArthurFerreira2/reinette-II-plus/releases/tag/0.3b)
+[download windows binaries](https://github.com/ArthurFerreira2/reinette-II-plus/releases/tag/0.4b)
 
 ### Featuring :
 
 * all video modes in color
 * mono sound with mute/unmute
-* 48KB (no language card support)
+* 64KB (language card support)
 * paddles/joystick with trim adjustment
 * paste text from clipboard
 * disk ][ adapter with two drives (.nib files only)
 * drag and drop .nib files to inset a floppy
 * save floppy changes back to host
 * screen scaling by integer increments
+* easy screenshot
 
 
 It uses the same MOS 6502 CPU emulator as her sisters (now christened [puce6502](https://github.com/ArthurFerreira2/puce6502)).\
@@ -48,18 +49,28 @@ Pressing the ALT key while dropping the file inserts it into drive 2.
 
 Use the functions keys to control the emulator itself :
 ```
-* F1    : writes the changes of the floppy in drive 0 back to host
-* F2    : writes the changes of the floppy in drive 1 back to host
-* F3    : zoom out down to 1:1 pixels
-* F4    : zoom in, max 8x
-* F5    : reduce joystick trim
-* F6    : increase joystick trim
-* F7    : paste text from clipboard
-* F8    : mute / un-mute sound
-* F9    : monochrome / color display (only in HGR mode)
-* F10   : pause / un-pause the emulator
-* F11   : reset / CTRL-F11 : break
-* F12   : quit the emulator
+* F1       : display save how to
+* ctrl F1  : writes the changes of the floppy in drive 0 back to host
+* alt  F1  : writes the changes of the floppy in drive 1 back to host
+* F2       : save a screenshot into the screenshots directory
+* F3       : paste text from clipboard
+* F4       : mute / unmute sound
+* shift F4 : increase volume
+* ctrl  F4 : decrease volume
+* F5       : reset joystick release speed,
+* shift F5 : increase joystick release speed
+* crtl  F5 : decrease joystick release speed,
+* F6       : reset joystick action speed,
+* shift F6 : increase joystick action speed
+* crtl  F6 : decrease joystick action speed,
+* F7       : reset the zoom to 2:1
+* shift F7 : increase zoom up to 8:1 max
+* ctrl  F7 : decrease zoom down to 1:1 pixels
+* F8       : monochrome / color display (only in HGR mode)
+* F9       : pause / un-pause the emulator
+* F10      : break
+* F11      : reset
+* F12      : about, help
 
 Paddles / Joystick :
 
@@ -76,12 +87,12 @@ Paddles / Joystick :
 
 * ~~high pitch noise at high volume on windows (Linux Ubuntu tested OK)~~
 * ~~sound cracks when playing for long period (intro music for example)~~
-* CPU is not 100% cycle accurate - see source file for more details
+* ~~CPU is not 100% cycle accurate - see source file for more details~~
 * colors are approximate (taken from a scan of an old Beagle bros. poster)
 * ~~HGR video is inaccurate, and does not implement color fringing~~
 * ~~disk ][ access is artificially accelerated~~ - considered as a feature
 * only support .nib floppy images. (you can use [CiderPress](https://github.com/fadden/ciderpress) to convert your images to this format)
-* only has 48KB of RAM (can't run software requiring the language card)
+* ~~only has 48KB of RAM (can't run software requiring the language card)~~
 * and many others ...
 
 ### To do
@@ -91,7 +102,7 @@ Paddles / Joystick :
 * check for more accurate RGB values.
 * ~~implement color fringe effect in HGR~~
 * ~~re-implement Paddles and Joystick support for analog simulation~~
-* implement the language card and extend the RAM of **reinette II plus** to 64K to support more software.
+* ~~implement the language card and extend the RAM of **reinette II plus** to 64K to support more software.~~
 * for 6502 coders :
   * add the ability to insert a binary file at a specified address
   * give the user the option to start with the original Apple II rom

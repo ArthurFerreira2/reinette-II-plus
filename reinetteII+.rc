@@ -1,7 +1,7 @@
 1 ICON "assets/reinetteII+.ico"
 1 VERSIONINFO
-FILEVERSION     0,3,1,0
-PRODUCTVERSION  0,3,0,0
+FILEVERSION     0,4,1,0
+PRODUCTVERSION  0,4,0,0
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
@@ -9,12 +9,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "Arthur Ferreira"
       VALUE "FileDescription", "Apple II+ emulator"
-      VALUE "FileVersion", "0.3.1.0"
+      VALUE "FileVersion", "0.4.1.0"
       VALUE "InternalName", "reinette II plus"
       VALUE "LegalCopyright", "Arthur Ferreira"
       VALUE "OriginalFilename", "reinetteII+.exe"
       VALUE "ProductName", "reinette II plus"
-      VALUE "ProductVersion", "0.3"
+      VALUE "ProductVersion", "0.4"
     END
   END
   BLOCK "VarFileInfo"
