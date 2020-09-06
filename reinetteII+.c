@@ -555,8 +555,8 @@ int main(int argc, char *argv[]){
 
           case SDLK_F8: monochrome = !monochrome; break;                        // toggle monochrome for HGR mode
           case SDLK_F9: paused = !paused; break;                                // toggle pause
-          case SDLK_F10: puce6502Break();                                       // simulate a break
-          case SDLK_F11: puce6502Reset();                                       // reset
+          case SDLK_F10: puce6502Break(); break;                                // simulate a break
+          case SDLK_F11: puce6502Reset(); break;                                // reset
 
           case SDLK_F12:                                                        // help box
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Help",
