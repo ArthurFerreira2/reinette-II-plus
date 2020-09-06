@@ -45,7 +45,7 @@ typedef enum {false, true} bool;
 #define BK2START 0xD000
 #define BK2SIZE  0x1000
 #define SL6START 0xC600
-#define SL6SIZE  0x00FF
+#define SL6SIZE  0x0100
 
 uint8_t ram[RAMSIZE];  // 48K of ram in $000-$BFFF
 uint8_t rom[ROMSIZE];  // 12K of rom in $D000-$FFFF
