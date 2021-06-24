@@ -32,13 +32,13 @@ This emulator is not accurate in many ways and does not compete with
 
 I wrote it with the goal to better understand the Apple ][ internals, and I'm publishing the sources in the hope they will be of any help.
 
-It's compact, less than 1000 SLOC, with two source files only, one for the CPU emulation, the other for the computer itself.
+It's compact, with two source files only, one for the CPU emulation, the other for the computer itself.
 
 I did my best to comment the code, and if you have an idea of how an Apple ][ works, it should be easy for you to understand the code, modify and enhance it for your needs (see TODO section).
 
 ### Startup
 
-  You can specify a .nib file on the command line to start the emulator with a floppy engaged in drive 1. Otherwise, the emulator will start with no floppy (and thus waits until you press the reset key or drag and drop a .nib file)
+  You can specify a .nib file at the command line to start the emulator with a floppy engaged in drive 1. Otherwise, the emulator will start with no floppy (and thus waits until you press the reset key or drag and drop a .nib file)
 
 ### Usage
 
