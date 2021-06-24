@@ -1,5 +1,5 @@
 CC = gcc
-FLAGS = -std=c99 -pedantic -Wpedantic -Wall -O3
+FLAGS = -std=c11 -pedantic -Wpedantic -Wall -O3
 
 LIBS = -lSDL2
 # comment these two lines if you are under Linux :

@@ -24,7 +24,7 @@ After [reinette](https://github.com/ArthurFerreira2/reinette) (Apple 1 emulator)
 * easy screenshot
 
 
-It uses the same MOS 6502 CPU emulator as her sisters (now christened [puce6502](https://github.com/ArthurFerreira2/puce6502)).\
+It uses an optimized and accurate MOS 6502 CPU emulator (now christened [puce6502](https://github.com/ArthurFerreira2/puce6502)).\
 You only need SDL2 to compile it. (I'm not using SDL_Mixer, but only the native SDL2 audio functions)
 
 This emulator is not accurate in many ways and does not compete with
@@ -66,9 +66,7 @@ Use the functions keys to control the emulator itself :
 * F7       : reset the zoom to 2:1
 * shift F7 : increase zoom up to 8:1 max
 * ctrl  F7 : decrease zoom down to 1:1 pixels
-* F8       : monochrome / color display (only in HGR mode)
-* F9       : pause / un-pause the emulator
-* F10      : break
+* F10       : pause / un-pause the emulator
 * F11      : reset
 * F12      : about, help
 

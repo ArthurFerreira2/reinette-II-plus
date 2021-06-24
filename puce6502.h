@@ -1,10 +1,9 @@
 /*
-
   Puce6502 - MOS 6502 cpu emulator
   Last modified 1st of August 2020
   Copyright (c) 2018 Arthur Ferreira (arthur.ferreira2@gmail.com)
 
-  This version has been modified for reinette II plus, a french Apple II plus
+  This version has been modified for Reinette II plus, a french Apple II plus
   emulator using SDL2 (https://github.com/ArthurFerreira2/reinette-II-plus).
 
   Please download the latest version from
@@ -27,36 +26,26 @@
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
   THE SOFTWARE.
-
 */
+
 
 #ifndef _PUCE6502_H
 #define _PUCE6502_H
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
-typedef enum {false, true} bool;
+typedef enum { false, true } bool;
 
-#define RAMSIZE  0xC000
-#define ROMSTART 0xD000
-#define ROMSIZE  0x3000
-#define LGCSTART 0xD000
-#define LGCSIZE  0x3000
-#define BK2START 0xD000
-#define BK2SIZE  0x1000
-#define SL6START 0xC600
-#define SL6SIZE  0x0100
+extern unsigned long long int ticks;
 
-uint8_t ram[RAMSIZE];  // 48K of ram in $000-$BFFF
-uint8_t rom[ROMSIZE];  // 12K of rom in $D000-$FFFF
-uint8_t lgc[LGCSIZE];  // Language Card 12K in $D000-$FFFF
-uint8_t bk2[BK2SIZE];  // bank 2 of Language Card 4K in $D000-$DFFF
-uint8_t sl6[SL6SIZE];  // P5A disk ][ PROM in slot 6
+uint16_t puce6502Exec(unsigned long long int cycleCount);
+void puce6502RST();
+void puce6502IRQ();
+void puce6502NMI();
 
-long long int ticks;
-
-void puce6502Exec(long long int cycleCount);
-void puce6502Reset();
-void puce6502Break();
+// void printRegs();
+// void dasm(uint16_t address);
+// void setPC(uint16_t address);
+// uint16_t getPC();
 
 #endif
